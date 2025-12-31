@@ -1,0 +1,20 @@
+﻿# Visual Studio
+.vs/
+x64/
+Debug/
+Release/
+
+# 编译文件
+*. pch
+*.ipch
+*.pdb
+*.ilk
+*.obj
+*.log
+*.tlog
+*.db
+
+# ClamAV 大文件
+*.cvd
+*.cld
+*.lib
