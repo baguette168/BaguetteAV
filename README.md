@@ -88,7 +88,7 @@ Rootkit 检测项目
 
 3. 打开项目
 
-使用 Visual Studio 2022 打开 BaguetteAV.slnx
+使用 Visual Studio 打开 BaguetteAV.slnx
 
 4. 配置平台
 
