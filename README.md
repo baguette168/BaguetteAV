@@ -69,7 +69,6 @@ Rootkit 检测项目
 
 1. 克隆仓库
    git clone https://github.com/baguette168/BaguetteAV.git
-   cd BaguetteAV
 
 2. 下载病毒库
 
@@ -89,31 +88,7 @@ Rootkit 检测项目
 
 💡 生成后事件会自动复制 DLL、证书到输出目录
 
-📁 项目结构
-
-BaguetteAV/
-├── .gitignore
-├── README.md
-├── LICENSE
-├── BaguetteAV.slnx          # VS 解决方案
-└── BaguetteAV/
-    ├── 3rdparty/clamav/
-    │   ├── include/         # ClamAV 头文件
-    │   ├── lib/             # ClamAV 静态库
-    │   └── dll/             # ClamAV 动态库
-    ├── certs/               # 证书文件
-    ├── database/            # 病毒库（需下载）
-    ├── res/                 # 资源文件
-    ├── BaguetteAV.cpp       # 程序入口
-    ├── BaguetteAVDlg.*      # 主界面
-    ├── SplashDlg.*          # 启动画面
-    ├── ClamAVWrapper.*      # ClamAV 封装
-    ├── ScanManager.*        # 扫描管理
-    └── RootkitDetector.*    # Rootkit 检测
-
-📸 截图
-
-启动画面
+📸 启动画面
 
                                  o8888888o
                                 88" .   "88
