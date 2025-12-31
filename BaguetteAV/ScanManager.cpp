@@ -104,7 +104,7 @@ void ScanManager::ScanFileInternal(const std::string& filePath)
     bool success = m_clamav->ScanFile(filePath, result);
 
     m_scannedCount = 1;
-    if (success && result.find("发现病毒") != std::string::npos) {
+    if (success && result.find("发现威胁") != std::string::npos) {
         m_threatCount = 1;
         PostLog("[! ] " + result);
     }
@@ -194,7 +194,7 @@ void ScanManager::ScanDirectoryInternal(const std::string& dirPath)
 
         m_scannedCount++;
 
-        if (success && result.find("发现病毒") != std::string::npos) {
+        if (success && result.find("发现威胁") != std::string::npos) {
             m_threatCount++;
             PostLog("[! ] " + result + " - " + filePath);
         }
