@@ -1,20 +1,28 @@
-﻿# Visual Studio
+﻿# 病毒库通过 Release 下载
+database/*.cvd
+database/*.cld
+
+# 大文件通过 Release 下载
+BaguetteAV/3rdparty/clamav/lib/clamav_rust.lib
+
+# Visual Studio
 .vs/
 x64/
 Debug/
 Release/
+*.user
+*.suo
+*.aps
+*.log
 
-# 编译文件
-*. pch
-*.ipch
+# 编译中间文件
+*.obj
+*.pch
 *.pdb
 *.ilk
-*.obj
-*.log
-*.tlog
-*.db
+*.res
+*.tlog/
 
-# ClamAV 大文件
-*.cvd
-*.cld
-*.lib
+# 备份
+*_backup/
+*.bak

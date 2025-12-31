@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
-#include <afxwin.h> // สนำร CListBox
+#include <afxwin.h>
+
+struct cl_engine;
 
 class ClamAVWrapper
 {
@@ -9,10 +11,14 @@ public:
     ~ClamAVWrapper();
 
     bool Initialize();
-    bool ScanFile(const std::string& path, std::string& result);
+    void Uninitialize();
+    bool ScanFile(const std::string& filePath, std::string& result);
 
 private:
+    void Log(const std::string& msg);
+    std::string GetExeDirectory();
+
     std::string m_dbPath;
+    cl_engine* m_engine;
     CListBox* m_LogList;
-    void Log(const CString& text);
 };

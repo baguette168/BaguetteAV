@@ -94,11 +94,16 @@
       <PreprocessorDefinitions>_WINDOWS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>C:\OpenSSL-Win64\include;C:\Users\John Roan\source\repos\BaguetteAV\BaguetteAV\3rdparty\clamav\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <AdditionalLibraryDirectories>C:\Users\John Roan\source\repos\BaguetteAV\BaguetteAV\3rdparty\clamav\lib;C:\OpenSSL-Win64\lib\VC\x64\MDd;C:\OpenSSL-Win64\lib\VC\x64\MD</AdditionalLibraryDirectories>
       <AdditionalDependencies>clamav.lib;clamav_rust.lib;clammspack.lib;clamunrar.lib;freshclam.lib;ws2_32.lib;libssl.lib;libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreAllDefaultLibraries>
+      </IgnoreAllDefaultLibraries>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -110,6 +115,13 @@
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
+    <PostBuildEvent>
+      <Command>xcopy /Y /D "$(ProjectDir)3rdparty\clamav\dll\*.dll" "$(OutDir)"
+if not exist "$(OutDir)certs" mkdir "$(OutDir)certs"
+xcopy /Y /D "$(ProjectDir)certs\*.*" "$(OutDir)certs\"
+if not exist "$(OutDir)database" mkdir "$(OutDir)database"
+xcopy /Y /D "$(ProjectDir)database\*.cvd" "$(OutDir)database\"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -169,6 +181,7 @@
       <PreprocessorDefinitions>_WINDOWS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>C:\OpenSSL-Win64\include;C:\Users\John Roan\source\repos\BaguetteAV\BaguetteAV\3rdparty\clamav\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -176,6 +189,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>C:\Users\John Roan\source\repos\BaguetteAV\BaguetteAV\3rdparty\clamav\lib;C:\OpenSSL-Win64\lib\VC\x64\MDd;C:\OpenSSL-Win64\lib\VC\x64\MD</AdditionalLibraryDirectories>
       <AdditionalDependencies>clamav.lib;clamav_rust.lib;clammspack.lib;clamunrar.lib;freshclam.lib;ws2_32.lib;libssl.lib;libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreAllDefaultLibraries>
+      </IgnoreAllDefaultLibraries>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -187,25 +204,34 @@
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
+    <PostBuildEvent>
+      <Command>xcopy /Y /D "$(ProjectDir)3rdparty\clamav\dll\*.dll" "$(OutDir)"
+if not exist "$(OutDir)certs" mkdir "$(OutDir)certs"
+xcopy /Y /D "$(ProjectDir)certs\*.*" "$(OutDir)certs\"
+if not exist "$(OutDir)database" mkdir "$(OutDir)database"
+xcopy /Y /D "$(ProjectDir)database\*.cvd" "$(OutDir)database\"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\..\Desktop\vedio\LogHelper.h" />
+    <ClInclude Include="..\..\..\..\Desktop\vedio\SystemInfo.h" />
     <ClInclude Include="BaguetteAV.h" />
     <ClInclude Include="BaguetteAVDlg.h" />
     <ClInclude Include="ClamAVWrapper.h" />
     <ClInclude Include="framework.h" />
-    <ClInclude Include="LogHelper.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="RootkitDetector.h" />
     <ClInclude Include="ScanManager.h" />
-    <ClInclude Include="SystemInfo.h" />
+    <ClInclude Include="SplashDlg.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\..\Desktop\vedio\LogHelper.cpp" />
+    <ClCompile Include="..\..\..\..\Desktop\vedio\SystemInfo.cpp" />
     <ClCompile Include="BaguetteAV.cpp" />
     <ClCompile Include="BaguetteAVDlg.cpp" />
     <ClCompile Include="ClamAVWrapper.cpp" />
-    <ClCompile Include="LogHelper.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -214,7 +240,7 @@
     </ClCompile>
     <ClCompile Include="RootkitDetector.cpp" />
     <ClCompile Include="ScanManager.cpp" />
-    <ClCompile Include="SystemInfo.cpp" />
+    <ClCompile Include="SplashDlg.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="BaguetteAV.rc" />
