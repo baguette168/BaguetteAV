@@ -37,7 +37,7 @@ function Invoke-PipeCommand {
 
 function Get-ServicePid {
     $output = & sc.exe queryex $ServiceName 2>&1
-    $match = [regex]::Match(($output -join "`n"), 'PID\\\\s*:\\\\s*(\\\\d+)')
+    $match = [regex]::Match(($output -join "`n"), 'PID\s*:\s*(\d+)')
     if (-not $match.Success) { return 0 }
     return [int]$match.Groups[1].Value
 }
@@ -61,7 +61,7 @@ Assert-Administrator
 if (-not (Test-Path -LiteralPath $ServiceExe)) { throw "Service executable not found: $ServiceExe" }
 $ServiceExe = (Resolve-Path -LiteralPath $ServiceExe).Path
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
-    $OutputPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts\\\\service-verification.json'
+    $OutputPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts\service-verification.json'
 }
 
 $existing = & sc.exe query $ServiceName 2>&1
@@ -94,8 +94,8 @@ try {
 
     $config = (& sc.exe qc $ServiceName 2>&1) -join "`n"
     $result.initialQuery = $config
-    if ($config -match 'START_TYPE\\\\s*:\\\\s*([^\\\\r\\\\n]+)') { $result.startType = $Matches[1].Trim() }
-    if ($config -match 'SERVICE_START_NAME\\\\s*:\\\\s*([^\\\\r\\\\n]+)') { $result.account = $Matches[1].Trim() }
+    if ($config -match 'START_TYPE\s*:\s*([^\r\n]+)') { $result.startType = $Matches[1].Trim() }
+    if ($config -match 'SERVICE_START_NAME\s*:\s*([^\r\n]+)') { $result.account = $Matches[1].Trim() }
 
     $failure = (& sc.exe qfailure $ServiceName 2>&1) -join "`n"
     $result.failureActions = $failure
