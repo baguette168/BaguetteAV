@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using BaguetteAV.EDR.Core.Models;
 using BaguetteAV.EDR.Core.Policy;
+using BaguetteAV.EDR.Core.Services;
 
 namespace BaguetteAV.EDR.PolicyTool;
 
@@ -22,6 +23,13 @@ internal static class Program
         var pluginRoot = TakeOption(rest, "--plugin-root");
         var json = rest.Remove("--json");
         var repository = new PolicyRepository(root);
+        var mutating = command is "install" or "activate" or "deactivate" or "rollback" or "remove" or "trust-plugin";
+        if (root is null && (command != "trust-plugin" || pluginRoot is null) && mutating &&
+            !DataDirectorySecurity.TryHarden(SettingsStore.DataDirectory, out var aclError))
+        {
+            Console.Error.WriteLine(string.Concat("数据目录权限加固失败，拒绝写入策略或插件信任清单：", aclError));
+            return 2;
+        }
         try
         {
             return command switch

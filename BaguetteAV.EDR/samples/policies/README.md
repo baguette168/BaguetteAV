@@ -31,7 +31,7 @@ dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -
 
 响应动作只有在设置中开启“自动处置”后才会执行。策略不能绕过受保护进程和系统目录限制，也不能执行任意命令。
 
-建议新规则先使用 `response: "alert"` 观察误报，确认后再改为受限处置动作并导入新版本。已安装策略在每次热加载时都会核对元数据中的 SHA256，手工修改 `policy.json` 会被拒绝。
+建议新规则先使用 `response: "alert"` 观察误报，确认后再改为受限处置动作并导入新版本。同一策略 ID/版本不允许改写为不同内容；规则 ID 不能与内置规则或其他已安装策略重复。已安装策略在每次热加载时都会核对元数据中的 SHA256，手工修改 `policy.json` 会被拒绝，导入、启停、回滚和删除会追加到 `audit.jsonl`。
 
 ## 研究流程
 

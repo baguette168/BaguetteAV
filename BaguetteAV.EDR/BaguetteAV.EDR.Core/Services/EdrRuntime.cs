@@ -28,11 +28,13 @@ public sealed class EdrRuntime : IDisposable
     private long _eventCount;
     private long _blockedCount;
     private int _processCount;
+    private readonly bool _externalContentTrusted;
+    private readonly string _dataDirectoryError = string.Empty;
     private bool _disposed;
 
-    public EdrRuntime(PolicyRepository? policies = null, PluginLoader? plugins = null)
+    public EdrRuntime(PolicyRepository? policies = null, PluginLoader? plugins = null, bool? externalContentTrusted = null)
     {
-        Settings = _settingsStore.Load();
+        Settings = new EdrSettings();
         Log = new LogService();
         Inspector = new ProcessInspector();
         Detections = new DetectionStore(Log);
@@ -45,6 +47,21 @@ public sealed class EdrRuntime : IDisposable
         Sysmon = new SysmonEventReader();
         Policies = policies ?? new PolicyRepository();
         Plugins = plugins ?? new PluginLoader();
+        if (externalContentTrusted.HasValue)
+        {
+            _externalContentTrusted = externalContentTrusted.Value;
+        }
+        else if (policies is not null || plugins is not null)
+        {
+            _externalContentTrusted = true;
+        }
+        else
+        {
+            _externalContentTrusted = DataDirectorySecurity.TryHarden(
+                SettingsStore.DataDirectory, out var aclError);
+            _dataDirectoryError = aclError;
+        }
+        Settings = _settingsStore.Load();
         _rules = BuildRules();
     }
 
@@ -217,8 +234,11 @@ public sealed class EdrRuntime : IDisposable
     {
         var rules = RuleCatalog.CreateDefault().ToList();
         var ids = new HashSet<string>(rules.Select(r => r.Id), StringComparer.OrdinalIgnoreCase);
-        var bundle = Policies.LoadActive();
+        var bundle = _externalContentTrusted ? Policies.LoadActive() : new PolicyBundle();
         var errors = new List<PolicyLoadError>(bundle.Errors);
+        if (!_externalContentTrusted)
+            errors.Add(new PolicyLoadError("security",
+                string.Concat("数据目录 ACL 加固失败，已禁用外部策略与插件：", _dataDirectoryError)));
         foreach (var pack in bundle.Packs)
         {
             foreach (var policyRule in pack.Rules)
@@ -231,7 +251,7 @@ public sealed class EdrRuntime : IDisposable
                 rules.Add(new PolicyRuleAdapter(pack, policyRule));
             }
         }
-        var pluginResult = Plugins.Load();
+        var pluginResult = _externalContentTrusted ? Plugins.Load() : new PluginLoadResult();
         errors.AddRange(pluginResult.Errors);
         foreach (var pack in pluginResult.Packs)
         {

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using BaguetteAV.EDR.Core.Rules;
 
 namespace BaguetteAV.EDR.Core.Policy;
 
@@ -16,6 +17,7 @@ public sealed class PolicyRepository
     public string Root => _root;
     public string InstalledDirectory => Path.Combine(_root, "installed");
     public string StatePath => Path.Combine(_root, "state.json");
+    public string AuditPath => Path.Combine(_root, "audit.jsonl");
 
     public PolicyImportResult InstallFromFile(string sourcePath, bool activate = true)
     {
@@ -45,8 +47,25 @@ public sealed class PolicyRepository
             {
                 var hash = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
                 var folder = Path.Combine(InstalledDirectory, pack.Id, pack.Version);
+                var policyPath = Path.Combine(folder, "policy.json");
+                if (File.Exists(policyPath))
+                {
+                    var existingHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(policyPath))).ToLowerInvariant();
+                    if (!string.Equals(existingHash, hash, StringComparison.OrdinalIgnoreCase))
+                    {
+                        validation.Error("version", "同一策略 ID/版本已安装且内容不同；请提升版本号后再导入");
+                        return new PolicyImportResult(false, "策略版本内容不可变，请提升版本号", null, validation);
+                    }
+                }
+                var conflicts = FindRuleConflicts(pack);
+                if (conflicts.Count > 0)
+                {
+                    foreach (var conflict in conflicts)
+                        validation.Error("rules", conflict);
+                    return new PolicyImportResult(false, "策略规则 ID 冲突", null, validation);
+                }
                 Directory.CreateDirectory(folder);
-                AtomicWrite(Path.Combine(folder, "policy.json"), json);
+                AtomicWrite(policyPath, json);
                 var meta = new PolicyMeta
                 {
                     Id = pack.Id,
@@ -71,6 +90,7 @@ public sealed class PolicyRepository
                     entry.Active = pack.Version;
                     SaveState(state);
                 }
+                Audit("install", pack.Id, pack.Version, hash);
 
                 var installed = new InstalledPolicy
                 {
@@ -155,6 +175,7 @@ public sealed class PolicyRepository
                 entry.Active = version;
             }
             SaveState(state);
+            Audit(string.IsNullOrWhiteSpace(version) ? "deactivate" : "activate", id, version ?? string.Empty);
             return true;
         }
     }
@@ -170,6 +191,7 @@ public sealed class PolicyRepository
             entry.Previous = entry.Active;
             entry.Active = target;
             SaveState(state);
+            Audit("rollback", id, target);
             return true;
         }
     }
@@ -187,6 +209,7 @@ public sealed class PolicyRepository
             if (Directory.Exists(Path.Combine(InstalledDirectory, id)) &&
                 !Directory.EnumerateFileSystemEntries(Path.Combine(InstalledDirectory, id)).Any())
                 Directory.Delete(Path.Combine(InstalledDirectory, id));
+            Audit("remove", id, version);
             return true;
         }
     }
@@ -264,6 +287,64 @@ public sealed class PolicyRepository
             }
         }
         return bundle;
+    }
+
+    private List<string> FindRuleConflicts(PolicyPack pack)
+    {
+        var owners = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var rule in RuleCatalog.CreateDefault())
+            owners[rule.Id] = "内置规则";
+        foreach (var installed in LoadInstalledPacks(pack.Id))
+        foreach (var rule in installed.Rules)
+            owners.TryAdd(rule.Id, installed.Id);
+        return pack.Rules
+            .Where(rule => owners.ContainsKey(rule.Id))
+            .Select(rule => string.Concat("规则 ID ", rule.Id, " 与 ", owners[rule.Id], " 冲突"))
+            .ToList();
+    }
+
+    private IEnumerable<PolicyPack> LoadInstalledPacks(string excludeId)
+    {
+        if (!Directory.Exists(InstalledDirectory)) yield break;
+        foreach (var packDir in Directory.EnumerateDirectories(InstalledDirectory))
+        {
+            var id = Path.GetFileName(packDir);
+            if (string.Equals(id, excludeId, StringComparison.OrdinalIgnoreCase)) continue;
+            foreach (var versionDir in Directory.EnumerateDirectories(packDir))
+            {
+                var path = Path.Combine(versionDir, "policy.json");
+                if (!File.Exists(path)) continue;
+                PolicyPack? pack = null;
+                try
+                {
+                    pack = JsonSerializer.Deserialize<PolicyPack>(File.ReadAllText(path), PolicyJson.Options);
+                }
+                catch { }
+                if (pack is not null) yield return pack;
+            }
+        }
+    }
+
+    private void Audit(string action, string id, string version, string sha256 = "")
+    {
+        try
+        {
+            Directory.CreateDirectory(_root);
+            var entry = new
+            {
+                timestamp = DateTimeOffset.Now.ToString("O"),
+                action,
+                policyId = id,
+                version,
+                sha256,
+                user = Environment.UserName,
+                machine = Environment.MachineName
+            };
+            File.AppendAllText(AuditPath,
+                string.Concat(JsonSerializer.Serialize(entry), Environment.NewLine),
+                new System.Text.UTF8Encoding(false));
+        }
+        catch { }
     }
 
     private PolicyState LoadState()

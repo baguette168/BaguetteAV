@@ -405,6 +405,49 @@ public sealed class PolicyTests : IDisposable
             PolicyCoverageAnalyzer.ToMarkdown(report));
     }
 
+    [Fact]
+    public void InstallRejectsChangedContentForExistingVersion()
+    {
+        var repository = new PolicyRepository(_root);
+        Assert.True(repository.Install(KernelPack, "first.json", activate: true).Success);
+
+        var changed = KernelPack.Replace("\"score\": 24", "\"score\": 25");
+        var second = repository.Install(changed, "second.json", activate: true);
+
+        Assert.False(second.Success);
+        Assert.Contains(second.Validation!.Errors,
+            error => error.Contains("不可变") || error.Contains("提升版本"));
+    }
+
+    [Fact]
+    public void InstallRejectsRuleIdConflictAcrossPolicies()
+    {
+        var repository = new PolicyRepository(_root);
+        Assert.True(repository.Install(KernelPack, "first.json", activate: true).Success);
+        var conflicting = KernelPack
+            .Replace("research.kernel.baseline", "research.kernel.other")
+            .Replace("KERNEL-002", "KERNEL-003");
+
+        var result = repository.Install(conflicting, "conflict.json", activate: true);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Validation!.Errors,
+            error => error.Contains("KERNEL-001") && error.Contains("冲突"));
+    }
+
+    [Fact]
+    public void InstallWritesAuditTrail()
+    {
+        var repository = new PolicyRepository(_root);
+        var result = repository.Install(KernelPack, "audit.json", activate: true);
+
+        Assert.True(result.Success, result.Message);
+        Assert.True(File.Exists(repository.AuditPath));
+        var audit = File.ReadAllText(repository.AuditPath);
+        Assert.Contains("\"action\":\"install\"", audit);
+        Assert.Contains("research.kernel.baseline", audit);
+    }
+
     public void Dispose()
     {
         try { if (Directory.Exists(_root)) Directory.Delete(_root, true); } catch { }

@@ -364,6 +364,13 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             Multiselect = false
         };
         if (dialog.ShowDialog() != Forms.DialogResult.OK) return;
+        if (!DataDirectorySecurity.TryHarden(SettingsStore.DataDirectory, out var aclError))
+        {
+            var text = string.Concat("数据目录权限加固失败，拒绝导入策略：", aclError);
+            PolicyStatusText = text;
+            System.Windows.MessageBox.Show(text, "策略导入失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
         var result = _runtime.Policies.InstallFromFile(dialog.FileName, activate: true);
         if (!result.Success)
         {
