@@ -289,6 +289,122 @@ public sealed class PolicyTests : IDisposable
         Assert.Empty(runtime.PolicyErrors);
     }
 
+    [Fact]
+    public void TestSuitePassesPositiveAndStrictNegativeCases()
+    {
+        var validation = PolicyValidator.ValidateJson(KernelPack, out var pack);
+        Assert.True(validation.IsValid);
+        var suite = new PolicyTestSuite { Name = "kernel-regression" };
+        suite.Cases.Add(new PolicyTestCase
+        {
+            Name = "driver drop",
+            Expect = new List<string> { "KERNEL-001" },
+            Event = new TelemetryEvent
+            {
+                Kind = TelemetryKind.FileCreate,
+                FilePath = @"C:\Users\Public\dropper.sys"
+            },
+            Process = new ProcessContext
+            {
+                ImagePath = @"C:\Users\Public\dropper.exe",
+                IsUserWritable = true
+            }
+        });
+        suite.Cases.Add(new PolicyTestCase
+        {
+            Name = "benign driver",
+            Strict = true,
+            Event = new TelemetryEvent
+            {
+                Kind = TelemetryKind.FileCreate,
+                FilePath = @"C:\Windows\System32\drivers\disk.sys"
+            },
+            Process = new ProcessContext
+            {
+                ImagePath = @"C:\Windows\System32\drivers\disk.sys"
+            }
+        });
+
+        var result = PolicyTestRunner.Run(pack!, suite);
+
+        Assert.True(result.Success);
+        Assert.Equal(2, result.PassedCount);
+        Assert.Equal(0, result.FailedCount);
+    }
+
+    [Fact]
+    public void TestSuiteReportsMissingExpectedRule()
+    {
+        var validation = PolicyValidator.ValidateJson(KernelPack, out var pack);
+        Assert.True(validation.IsValid);
+        var suite = new PolicyTestSuite();
+        suite.Cases.Add(new PolicyTestCase
+        {
+            Name = "wrong expectation",
+            Expect = new List<string> { "KERNEL-002" },
+            Event = new TelemetryEvent
+            {
+                Kind = TelemetryKind.FileCreate,
+                FilePath = @"C:\Users\Public\dropper.sys"
+            },
+            Process = new ProcessContext
+            {
+                ImagePath = @"C:\Users\Public\dropper.exe",
+                IsUserWritable = true
+            }
+        });
+
+        var result = PolicyTestRunner.Run(pack!, suite);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Cases[0].Problems,
+            problem => problem.Contains("预期命中但未命中"));
+    }
+
+    [Fact]
+    public void TestSuiteRejectsUnknownRuleReference()
+    {
+        var validation = PolicyValidator.ValidateJson(KernelPack, out var pack);
+        Assert.True(validation.IsValid);
+        var suite = new PolicyTestSuite();
+        suite.Cases.Add(new PolicyTestCase
+        {
+            Name = "typo",
+            Expect = new List<string> { "KERNEL-999" },
+            Event = new TelemetryEvent { Kind = TelemetryKind.FileCreate },
+            Process = new ProcessContext()
+        });
+
+        var result = PolicyTestRunner.Run(pack!, suite);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Cases[0].Problems,
+            problem => problem.Contains("不存在规则"));
+    }
+
+    [Fact]
+    public void CoverageAggregatesTechniquesAndDuplicates()
+    {
+        var validation = PolicyValidator.ValidateJson(KernelPack, out var pack);
+        Assert.True(validation.IsValid);
+        var duplicate = new PolicyPack
+        {
+            Id = "research.kernel.duplicate",
+            Rules = pack!.Rules
+        };
+
+        var report = PolicyCoverageAnalyzer.Analyze(
+            new[] { pack, duplicate });
+
+        Assert.Equal(4, report.RuleCount);
+        Assert.Equal(4, report.MappedRuleCount);
+        Assert.Equal(0, report.UnmappedRuleCount);
+        Assert.Contains("T1014", report.Techniques.Keys);
+        Assert.Equal(2, report.DuplicateRuleIds.Count);
+        Assert.Contains("# B-EDR 策略覆盖报告",
+            PolicyCoverageAnalyzer.ToMarkdown(report));
+    }
+
     public void Dispose()
     {
         try { if (Directory.Exists(_root)) Directory.Delete(_root, true); } catch { }

@@ -159,6 +159,34 @@
                         </Border>
                     </StackPanel>
                 </Border>
+
+                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                    <StackPanel>
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="策略工程化验证" Style="{StaticResource H2}" />
+                                <TextBlock Text="把研究样本变成可重复的验收用例，并量化 ATT&amp;CK 与遥测覆盖。"
+                                           Style="{StaticResource Caption}" Margin="0,4,0,0" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Button Content="导出覆盖报告" Style="{StaticResource GhostButton}"
+                                        Command="{Binding ExportCoverageCommand}" />
+                                <Button Content="运行回归测试" Style="{StaticResource PrimaryButton}"
+                                        Margin="8,0,0,0" Command="{Binding RunPolicyTestsCommand}" />
+                            </StackPanel>
+                        </Grid>
+                        <Border Background="{StaticResource SurfaceAltBrush}" CornerRadius="6"
+                                Padding="12" Margin="0,12,0,0">
+                            <TextBlock Text="{Binding PolicyCoverageText}" Style="{StaticResource Body}"
+                                       TextWrapping="Wrap" />
+                        </Border>
+                        <Border Background="{StaticResource SurfaceAltBrush}" CornerRadius="6"
+                                Padding="12" Margin="0,8,0,0">
+                            <TextBlock Text="{Binding PolicyTestText}" Style="{StaticResource Body}"
+                                       TextWrapping="Wrap" />
+                        </Border>
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
     </Grid>

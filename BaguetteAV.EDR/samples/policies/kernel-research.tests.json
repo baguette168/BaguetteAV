@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "name": "内核马研究基线回归测试",
+  "description": "正样本必须命中，正常驱动样本必须保持静默",
+  "strict": false,
+  "cases": [
+    {
+      "name": "用户目录驱动落地",
+      "expect": ["RESEARCH-DRV-001"],
+      "event": {
+        "kind": "FileCreate",
+        "processId": 4100,
+        "image": "C:\\Users\\Public\\dropper.exe",
+        "filePath": "C:\\Users\\Public\\variantF.sys"
+      },
+      "process": {
+        "processId": 4100,
+        "imagePath": "C:\\Users\\Public\\dropper.exe",
+        "isUserWritable": true,
+        "isSigned": false
+      }
+    },
+    {
+      "name": "未签名驱动加载",
+      "expect": ["RESEARCH-DRV-002"],
+      "event": {
+        "kind": "DriverLoad",
+        "processId": 4100,
+        "image": "C:\\Users\\Public\\dropper.exe",
+        "driverPath": "C:\\Users\\Public\\unstrip.sys"
+      },
+      "process": {
+        "processId": 4100,
+        "imagePath": "C:\\Users\\Public\\unstrip.sys",
+        "isUserWritable": true,
+        "isSigned": false
+      }
+    },
+    {
+      "name": "WMI 事件订阅持久化",
+      "expect": ["RESEARCH-WMI-001"],
+      "event": {
+        "kind": "WmiFilter",
+        "processId": 4210,
+        "image": "C:\\Windows\\System32\\wbem\\wmiprvse.exe",
+        "wmiQuery": "powershell -enc AAAA"
+      },
+      "process": {
+        "processId": 4210,
+        "imagePath": "C:\\Windows\\System32\\wbem\\wmiprvse.exe"
+      }
+    },
+    {
+      "name": "8443 C2 外联",
+      "expect": ["RESEARCH-C2-001"],
+      "event": {
+        "kind": "NetworkConnect",
+        "processId": 4100,
+        "image": "C:\\Users\\Public\\np_rce.exe",
+        "destinationIp": "192.168.127.100",
+        "destinationPort": 8443
+      },
+      "process": {
+        "processId": 4100,
+        "imagePath": "C:\\Users\\Public\\np_rce.exe",
+        "isUserWritable": true
+      }
+    },
+    {
+      "name": "LSASS 高权限访问",
+      "expect": ["RESEARCH-LSASS-001"],
+      "event": {
+        "kind": "ProcessAccess",
+        "processId": 4100,
+        "image": "C:\\Users\\Public\\np_rce.exe",
+        "targetImage": "C:\\Windows\\System32\\lsass.exe",
+        "grantedAccess": "0x1010"
+      },
+      "process": {
+        "processId": 4100,
+        "imagePath": "C:\\Users\\Public\\np_rce.exe",
+        "isUserWritable": true
+      }
+    },
+    {
+      "name": "远程线程注入",
+      "expect": ["RESEARCH-INJECT-001"],
+      "event": {
+        "kind": "RemoteThread",
+        "processId": 4100,
+        "image": "C:\\Users\\Public\\np_rce.exe",
+        "targetImage": "C:\\Program Files\\Chrome\\chrome.exe"
+      },
+      "process": {
+        "processId": 4100,
+        "imagePath": "C:\\Users\\Public\\np_rce.exe",
+        "isUserWritable": true
+      }
+    },
+    {
+      "name": "正常系统驱动不告警",
+      "expect": [],
+      "strict": true,
+      "event": {
+        "kind": "FileCreate",
+        "processId": 4,
+        "image": "System",
+        "filePath": "C:\\Windows\\System32\\drivers\\disk.sys"
+      },
+      "process": {
+        "processId": 4,
+        "imagePath": "C:\\Windows\\System32\\drivers\\disk.sys",
+        "isUserWritable": false,
+        "isSigned": true
+      }
+    }
+  ]
+}

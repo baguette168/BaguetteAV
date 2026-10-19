@@ -81,6 +81,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private string _settingsSavedText = string.Empty;
     private string _policyStatusText = "尚未加载策略包";
     private string _policySimulationText = "尚未执行离线演练";
+    private string _policyCoverageText = "尚未分析策略覆盖";
+    private string _policyTestText = "尚未运行策略回归测试";
     private int _recentSampleCount;
     private string _clamAvStatus = "未配置";
     private CancellationTokenSource? _scanCts;
@@ -169,6 +171,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public RelayCommand OpenPolicyFolderCommand { get; private set; } = null!;
     public RelayCommand SimulatePolicyCommand { get; private set; } = null!;
     public RelayCommand ExportSamplesCommand { get; private set; } = null!;
+    public RelayCommand RunPolicyTestsCommand { get; private set; } = null!;
+    public RelayCommand ExportCoverageCommand { get; private set; } = null!;
 
     public string CurrentPage
     {
@@ -271,6 +275,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public string SettingsSavedText { get => _settingsSavedText; private set => SetProperty(ref _settingsSavedText, value); }
     public string PolicyStatusText { get => _policyStatusText; private set => SetProperty(ref _policyStatusText, value); }
     public string PolicySimulationText { get => _policySimulationText; private set => SetProperty(ref _policySimulationText, value); }
+    public string PolicyCoverageText { get => _policyCoverageText; private set => SetProperty(ref _policyCoverageText, value); }
+    public string PolicyTestText { get => _policyTestText; private set => SetProperty(ref _policyTestText, value); }
     public int RecentSampleCount { get => _recentSampleCount; private set => SetProperty(ref _recentSampleCount, value); }
     public int ActivePolicyCount => PolicyPacks.Count(p => p.Active);
     public int ActivePolicyRuleCount => PolicyPacks.Where(p => p.Active).Sum(p => p.RuleCount);
@@ -344,6 +350,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         });
         SimulatePolicyCommand = new RelayCommand(_ => SimulatePolicy());
         ExportSamplesCommand = new RelayCommand(_ => ExportSamples());
+        RunPolicyTestsCommand = new RelayCommand(_ => RunPolicyTests());
+        ExportCoverageCommand = new RelayCommand(_ => ExportCoverage());
     }
 
     private void ImportPolicy()
@@ -397,6 +405,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ActivePolicyRuleCount));
         PolicyStatusText = string.Concat("已安装 ", PolicyPacks.Count, " 个策略包，", active, " 个已启用");
         if (errors > 0) PolicyStatusText = string.Concat(PolicyStatusText, "，", errors, " 个加载错误");
+        var bundle = _runtime.Policies.LoadActive();
+        var coverage = PolicyCoverageAnalyzer.Analyze(
+            bundle.Packs, bundle.Errors);
+        PolicyCoverageText = coverage.Summary;
     }
 
     private void TogglePolicy(PolicyPackItem? item)
@@ -479,6 +491,109 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         if (result.Hits.Count > 12) lines.Add(string.Concat("另有 ", result.Hits.Count - 12, " 次命中未展开"));
         PolicySimulationText = string.Join(Environment.NewLine, lines);
         StatusMessage = string.Concat("策略演练完成：", result.Hits.Count, " 次命中");
+    }
+
+    private void RunPolicyTests()
+    {
+        string policyPath;
+        using (var dialog = new Forms.OpenFileDialog
+        {
+            Title = "选择待回归测试的策略包",
+            Filter = "B-EDR 策略包|*.json|JSON 文件|*.json",
+            CheckFileExists = true
+        })
+        {
+            if (dialog.ShowDialog() != Forms.DialogResult.OK) return;
+            policyPath = dialog.FileName;
+        }
+
+        var validation = PolicyValidator.ValidateJson(
+            File.ReadAllText(policyPath), out var pack);
+        if (pack is null || !validation.IsValid)
+        {
+            PolicyTestText = string.Concat(
+                "策略校验失败：",
+                string.Join("；", validation.Errors.Take(4)));
+            System.Windows.MessageBox.Show(PolicyTestText,
+                "策略回归测试", MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        string suitePath;
+        using (var dialog = new Forms.OpenFileDialog
+        {
+            Title = "选择回归测试用例",
+            Filter = "B-EDR 回归测试|*.tests.json|JSON 文件|*.json",
+            CheckFileExists = true
+        })
+        {
+            if (dialog.ShowDialog() != Forms.DialogResult.OK) return;
+            suitePath = dialog.FileName;
+        }
+
+        var loaded = PolicyTestSuiteLoader.Load(suitePath);
+        if (!loaded.Success || loaded.Suite is null)
+        {
+            PolicyTestText = loaded.Message;
+            System.Windows.MessageBox.Show(loaded.Message,
+                "策略回归测试", MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        var result = PolicyTestRunner.Run(pack, loaded.Suite);
+        var lines = new List<string>
+        {
+            string.Concat("用例 ", result.CaseCount,
+                " 个，通过 ", result.PassedCount,
+                "，失败 ", result.FailedCount)
+        };
+        foreach (var testCase in result.Cases)
+        {
+            var status = testCase.Passed ? "PASS" : "FAIL";
+            lines.Add(string.Concat("[", status, "] ",
+                testCase.Name));
+            foreach (var problem in testCase.Problems)
+                lines.Add(string.Concat("    ", problem));
+        }
+        PolicyTestText = string.Join(Environment.NewLine, lines);
+        StatusMessage = result.Success
+            ? "策略回归测试通过"
+            : "策略回归测试存在失败用例";
+        System.Windows.MessageBox.Show(
+            string.Concat("回归集：", result.SuiteName,
+                Environment.NewLine,
+                "通过 ", result.PassedCount,
+                " / ", result.CaseCount),
+            "策略回归测试", MessageBoxButton.OK,
+            result.Success ? MessageBoxImage.Information
+                : MessageBoxImage.Warning);
+    }
+
+    private void ExportCoverage()
+    {
+        var bundle = _runtime.Policies.LoadActive();
+        var report = PolicyCoverageAnalyzer.Analyze(
+            bundle.Packs, bundle.Errors);
+        PolicyCoverageText = report.Summary;
+        using var dialog = new Forms.SaveFileDialog
+        {
+            Title = "导出策略覆盖报告",
+            Filter = "Markdown|*.md|文本文件|*.txt",
+            FileName = string.Concat(
+                "B-EDR-策略覆盖-",
+                DateTime.Now.ToString("yyyyMMdd-HHmmss"), ".md")
+        };
+        if (dialog.ShowDialog() != Forms.DialogResult.OK) return;
+        File.WriteAllText(dialog.FileName,
+            PolicyCoverageAnalyzer.ToMarkdown(report),
+            new UTF8Encoding(false));
+        StatusMessage = string.Concat(
+            "覆盖报告已导出：", dialog.FileName);
+        System.Windows.MessageBox.Show(StatusMessage,
+            "策略覆盖", MessageBoxButton.OK,
+            MessageBoxImage.Information);
     }
 
     private void ExportSamples()

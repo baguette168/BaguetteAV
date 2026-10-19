@@ -34,6 +34,8 @@ internal static class Program
                 "rollback" => Rollback(repository, rest),
                 "remove" => Remove(repository, rest),
                 "simulate" => Simulate(rest, json),
+                "test" => Test(rest, json),
+                "coverage" => Coverage(repository, rest, json),
                 "plugins" => Plugins(new PluginLoader(pluginRoot), json),
                 "trust-plugin" => TrustPlugin(new PluginLoader(pluginRoot), rest),
                 "fields" => Fields(json),
@@ -154,6 +156,126 @@ internal static class Program
         return failOnHit && result.Hits.Count > 0 ? 3 : 0;
     }
 
+    private static int Test(List<string> args, bool json)
+    {
+        if (args.Count != 2)
+            return Usage("test <policy.json> <tests.json> [--json]");
+        var source = File.ReadAllText(args[0]);
+        var validation = PolicyValidator.ValidateJson(source, out var pack);
+        if (pack is null || !validation.IsValid)
+        {
+            PrintValidation(validation);
+            return 2;
+        }
+        var loaded = PolicyTestSuiteLoader.Load(args[1]);
+        if (!loaded.Success || loaded.Suite is null)
+        {
+            Console.Error.WriteLine(loaded.Message);
+            return 2;
+        }
+        var result = PolicyTestRunner.Run(pack, loaded.Suite);
+        if (json)
+        {
+            WriteJson(result);
+        }
+        else
+        {
+            Console.WriteLine(string.Concat(
+                "回归集：", result.SuiteName));
+            Console.WriteLine(string.Concat(
+                "用例 ", result.CaseCount, " 个，通过 ",
+                result.PassedCount, "，失败 ", result.FailedCount));
+            foreach (var testCase in result.Cases)
+            {
+                var status = testCase.Passed ? "PASS" : "FAIL";
+                Console.WriteLine(string.Concat(
+                    "  [", status, "] ", testCase.Name));
+                foreach (var problem in testCase.Problems)
+                    Console.WriteLine(string.Concat("         ", problem));
+                if (!testCase.Passed)
+                {
+                    var actual = testCase.Actual.Count == 0
+                        ? "无"
+                        : string.Join(", ", testCase.Actual);
+                    Console.WriteLine(string.Concat(
+                        "         实际命中：", actual));
+                }
+            }
+        }
+        return result.Success ? 0 : 3;
+    }
+
+    private static int Coverage(
+        PolicyRepository repository,
+        List<string> args,
+        bool json)
+    {
+        var markdown = args.Remove("--markdown");
+        var policyPath = TakeOption(args, "--policy");
+        if (args.Count != 0)
+        {
+            return Usage(
+                "coverage [--policy <policy.json>] [--json|--markdown]");
+        }
+        PolicyCoverageReport report;
+        if (!string.IsNullOrWhiteSpace(policyPath))
+        {
+            var validation = PolicyValidator.ValidateJson(
+                File.ReadAllText(policyPath), out var pack);
+            if (pack is null || !validation.IsValid)
+            {
+                PrintValidation(validation);
+                return 2;
+            }
+            report = PolicyCoverageAnalyzer.Analyze(new[] { pack });
+        }
+        else
+        {
+            var bundle = repository.LoadActive();
+            report = PolicyCoverageAnalyzer.Analyze(
+                bundle.Packs, bundle.Errors);
+        }
+
+        if (json)
+        {
+            WriteJson(report);
+        }
+        else if (markdown)
+        {
+            Console.WriteLine(
+                PolicyCoverageAnalyzer.ToMarkdown(report));
+        }
+        else
+        {
+            Console.WriteLine(report.Summary);
+            Console.WriteLine(string.Concat(
+                "策略包 ", report.PackCount,
+                " 个，规则 ", report.RuleCount,
+                " 条，启用 ", report.EnabledRuleCount, " 条"));
+            Console.WriteLine("ATT&CK 技术：");
+            foreach (var pair in report.Techniques)
+                Console.WriteLine(string.Concat(
+                    "  ", pair.Key, "  ", pair.Value));
+            Console.WriteLine("遥测事件：");
+            foreach (var pair in report.EventKinds)
+                Console.WriteLine(string.Concat(
+                    "  ", pair.Key, "  ", pair.Value));
+            if (report.UnmappedRuleCount > 0)
+                Console.WriteLine(string.Concat(
+                    "未标注 ATT&CK：", report.UnmappedRuleCount, " 条"));
+            if (report.DuplicateRuleIds.Count > 0)
+            {
+                Console.WriteLine(string.Concat(
+                    "重复规则 ID：",
+                    string.Join(", ", report.DuplicateRuleIds)));
+            }
+            if (report.LoadErrors.Count > 0)
+                Console.WriteLine(string.Concat(
+                    "加载错误：", report.LoadErrors.Count, " 个"));
+        }
+        return 0;
+    }
+
     private static int Fields(bool json)
     {
         if (json) { WriteJson(PolicyFields.KnownFields); return 0; }
@@ -235,6 +357,8 @@ B-EDR 策略工具
   bedr-policy rollback <policy-id> [--root <dir>]
   bedr-policy remove <policy-id> <version> [--root <dir>]
   bedr-policy simulate <policy.json> <events.json> [--fail-on-hit] [--json]
+  bedr-policy test <policy.json> <tests.json> [--json]
+  bedr-policy coverage [--policy <policy.json>] [--json|--markdown]
   bedr-policy plugins [--plugin-root <dir>] [--json]
   bedr-policy trust-plugin <plugin.dll> [--plugin-root <dir>]
   bedr-policy fields [--json]

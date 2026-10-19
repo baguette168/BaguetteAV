@@ -7,6 +7,8 @@
 ```powershell
 dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -- validate .\lab\BaguetteAV\BaguetteAV.EDR\samples\policies\kernel-research.policy.json
 dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -- simulate .\lab\BaguetteAV\BaguetteAV.EDR\samples\policies\kernel-research.policy.json .\lab\BaguetteAV\BaguetteAV.EDR\samples\policies\kernel-research.events.json
+dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -- test .\lab\BaguetteAV\BaguetteAV.EDR\samples\policies\kernel-research.policy.json .\lab\BaguetteAV\BaguetteAV.EDR\samples\policies\kernel-research.tests.json
+dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -- coverage --policy .\lab\BaguetteAV\BaguetteAV.EDR\samples\policies\kernel-research.policy.json --markdown
 dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -- install .\lab\BaguetteAV\BaguetteAV.EDR\samples\policies\kernel-research.policy.json
 ```
 
@@ -35,5 +37,6 @@ dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -
 
 1. 把样本行为整理成 `event/process` 事件样本。
 2. 编写策略并用 GUI 的“离线演练”或 `simulate` 命令做离线演练；界面可导出实时遥测作为样本。
-3. `validate` 通过后导入并启用。
-4. 线上命中后根据日志调整阈值；保留上一版本用于 `rollback`。
+3. 用 `test` 或 GUI“运行回归测试”固定正样本命中与负样本静默。
+4. `validate` 通过后导入并启用；`coverage` 输出 ATT&CK 与遥测覆盖。
+5. 线上命中后根据日志调整阈值；保留上一版本用于 `rollback`。

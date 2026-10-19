@@ -35,6 +35,7 @@ B-EDR 是 `BaguetteAV` 的第二代 Windows 单机端点检测与响应项目。
 - ClamAV 按需扫描与 Rootkit 交叉视图检查
 - 声明式 JSON 策略包：校验、SHA256 完整性复核、原子安装、仓库监视自动热加载、停用、回滚
 - 实时遥测导出、离线演练、自定义字段和受限响应动作
+- 策略回归测试（expect/forbid/strict）与 ATT&CK/遥测覆盖报告
 - 受信任代码插件：未登记或 SHA256 不匹配的 DLL 默认拒绝加载
 
 ## 自定义策略
@@ -67,8 +68,9 @@ B-EDR 是 `BaguetteAV` 的第二代 Windows 单机端点检测与响应项目。
 1. 在 GUI 中开启实时防护并导出真实遥测样本。
 2. 编写策略包和事件样本。
 3. 使用 GUI“离线演练”或 `bedr-policy simulate` 验证命中与误报。
-4. 导入策略，后台服务热加载，无需重启。
-5. 观察真实告警；用版本回滚恢复上一版策略。
+4. 用 `bedr-policy test` 固定回归用例，用 `coverage` 量化覆盖。
+5. 导入策略，后台服务热加载，无需重启。
+6. 观察真实告警；用版本回滚恢复上一版策略。
 
 策略加载时会重新核对活动版本、包 ID 和文件 SHA256；被替换或修改的
 `policy.json` 会被拒绝，其他内置规则和已校验策略继续运行。SHA256 是安装
@@ -79,6 +81,8 @@ B-EDR 是 `BaguetteAV` 的第二代 Windows 单机端点检测与响应项目。
 ```powershell
 dotnet run --project .\BaguetteAV.EDR.PolicyTool -- validate .\samples\policies\kernel-research.policy.json
 dotnet run --project .\BaguetteAV.EDR.PolicyTool -- simulate .\samples\policies\kernel-research.policy.json .\samples\policies\kernel-research.events.json
+dotnet run --project .\BaguetteAV.EDR.PolicyTool -- test .\samples\policies\kernel-research.policy.json .\samples\policies\kernel-research.tests.json
+dotnet run --project .\BaguetteAV.EDR.PolicyTool -- coverage --policy .\samples\policies\kernel-research.policy.json --markdown
 dotnet run --project .\BaguetteAV.EDR.PolicyTool -- install .\samples\policies\kernel-research.policy.json
 dotnet run --project .\BaguetteAV.EDR.PolicyTool -- list
 ```
