@@ -101,7 +101,12 @@ try {
     $result.failureActions = $failure
     if ($result.startType -notmatch 'AUTO_START') { throw "Unexpected start type: $($result.startType)" }
     if ($result.account -notmatch 'LocalSystem') { throw "Unexpected service account: $($result.account)" }
-    if ($failure -notmatch 'RESTART') { throw 'Failure restart actions are missing.' }
+    if ($failure -notmatch 'FAILURE_ACTIONS' -or
+        $failure -notmatch '5000' -or
+        $failure -notmatch '15000' -or
+        $failure -notmatch '60000') {
+        throw "Failure restart actions are missing or unexpected: $failure"
+    }
 
     $initialPid = Wait-ServiceRunning -TimeoutSeconds 30
     if ($initialPid -eq 0) { throw 'Service did not reach RUNNING.' }
