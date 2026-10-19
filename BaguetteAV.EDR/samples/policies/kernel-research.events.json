@@ -1,0 +1,74 @@
+[
+  {
+    "event": {
+      "kind": "FileCreate",
+      "processId": 4100,
+      "image": "C:\\Users\\Public\\dropper.exe",
+      "filePath": "C:\\Users\\Public\\variantF.sys"
+    },
+    "process": {
+      "processId": 4100,
+      "imagePath": "C:\\Users\\Public\\dropper.exe",
+      "isUserWritable": true,
+      "isSigned": false
+    }
+  },
+  {
+    "event": {
+      "kind": "DriverLoad",
+      "processId": 4100,
+      "image": "C:\\Users\\Public\\dropper.exe",
+      "driverPath": "C:\\Users\\Public\\unstrip.sys"
+    },
+    "process": {
+      "processId": 4100,
+      "imagePath": "C:\\Users\\Public\\unstrip.sys",
+      "isUserWritable": true,
+      "isSigned": false
+    }
+  },
+  {
+    "event": {
+      "kind": "NetworkConnect",
+      "processId": 4100,
+      "image": "C:\\Users\\Public\\np_rce.exe",
+      "destinationIp": "192.168.127.100",
+      "destinationPort": 8443
+    },
+    "process": {
+      "processId": 4100,
+      "imagePath": "C:\\Users\\Public\\np_rce.exe",
+      "isUserWritable": true,
+      "isSigned": false
+    }
+  },
+  {
+    "event": {
+      "kind": "ProcessAccess",
+      "processId": 4100,
+      "image": "C:\\Users\\Public\\np_rce.exe",
+      "targetImage": "C:\\Windows\\System32\\lsass.exe",
+      "grantedAccess": "0x1010"
+    },
+    "process": {
+      "processId": 4100,
+      "imagePath": "C:\\Users\\Public\\np_rce.exe",
+      "isUserWritable": true,
+      "isSigned": false
+    }
+  },
+  {
+    "event": {
+      "kind": "FileCreate",
+      "processId": 4,
+      "image": "System",
+      "filePath": "C:\\Windows\\System32\\drivers\\disk.sys"
+    },
+    "process": {
+      "processId": 4,
+      "imagePath": "C:\\Windows\\System32\\drivers\\disk.sys",
+      "isUserWritable": false,
+      "isSigned": true
+    }
+  }
+]

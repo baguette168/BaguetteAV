@@ -1,0 +1,97 @@
+<UserControl x:Class="BaguetteAV.EDR.App.Views.ScanView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolVis" />
+    </UserControl.Resources>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1.12*" />
+            <ColumnDefinition Width="14" />
+            <ColumnDefinition Width="1*" />
+        </Grid.ColumnDefinitions>
+        <Border Style="{StaticResource Card}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <StackPanel>
+                    <TextBlock Text="病毒扫描" Style="{StaticResource H2}" />
+                    <TextBlock Text="调用 ClamAV 引擎扫描文件或目录，支持快速、自定义与全盘扫描。" Style="{StaticResource Caption}" Margin="0,5,0,0" />
+                </StackPanel>
+                <Grid Grid.Row="1" Margin="0,18,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <TextBox Style="{StaticResource InputBox}" Text="{Binding ScanPath, UpdateSourceTrigger=PropertyChanged}" />
+                    <Button Grid.Column="1" Content="浏览" Style="{StaticResource SecondaryButton}" Margin="10,0,0,0" Command="{Binding BrowseScanPathCommand}" />
+                </Grid>
+                <WrapPanel Grid.Row="2" Margin="0,14,0,0">
+                    <Button Content="快速扫描" Style="{StaticResource PrimaryButton}" Command="{Binding StartScanCommand}" CommandParameter="quick" />
+                    <Button Content="扫描指定路径" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Command="{Binding StartScanCommand}" CommandParameter="custom" />
+                    <Button Content="全盘扫描" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0" Command="{Binding StartScanCommand}" CommandParameter="full" />
+                    <Button Content="取消" Style="{StaticResource GhostButton}" Margin="8,0,0,0" Command="{Binding CancelScanCommand}" />
+                </WrapPanel>
+                <StackPanel Grid.Row="3" Margin="0,18,0,0">
+                    <ProgressBar Height="6" Foreground="{StaticResource AccentBrush}" Background="#E9EEF5" BorderThickness="0"
+                                 IsIndeterminate="{Binding IsScanning}" Visibility="{Binding IsScanning, Converter={StaticResource BoolVis}}" />
+                    <TextBlock Text="{Binding ScanSummary}" Style="{StaticResource Muted}" Margin="0,10,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+                <ListBox Grid.Row="4" Style="{StaticResource PlainList}" ItemsSource="{Binding ScanFindings}" Margin="0,12,0,0">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{StaticResource DangerSoftBrush}" CornerRadius="8" Padding="10" Margin="0,0,0,6">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Signature}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource DangerBrush}" />
+                                    <TextBlock Text="{Binding Path}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Border>
+
+        <Border Grid.Column="2" Style="{StaticResource Card}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <StackPanel>
+                    <TextBlock Text="Rootkit 与持久化检查" Style="{StaticResource H2}" />
+                    <TextBlock Text="检查驱动服务、启动项、Hosts 文件与 WMI 事件订阅。" Style="{StaticResource Caption}" Margin="0,5,0,0" />
+                </StackPanel>
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,18,0,0">
+                    <Button Content="开始检查" Style="{StaticResource PrimaryButton}" Command="{Binding RunRootkitCommand}" />
+                    <TextBlock Text="{Binding RootkitStatus}" Style="{StaticResource Muted}" Margin="12,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap" />
+                </StackPanel>
+                <ProgressBar Grid.Row="2" Height="6" Margin="0,14,0,0" Foreground="{StaticResource AccentBrush}" Background="#E9EEF5" BorderThickness="0"
+                             IsIndeterminate="{Binding IsRootkitScanning}" Visibility="{Binding IsRootkitScanning, Converter={StaticResource BoolVis}}" />
+                <ScrollViewer Grid.Row="3" Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding RootkitFindings}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{StaticResource WarningSoftBrush}" CornerRadius="10" Padding="12" Margin="0,0,0,8">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding KindText}" FontSize="10.5" FontWeight="SemiBold" Foreground="#8A5A00" />
+                                            <TextBlock Text="{Binding Title}" FontSize="12.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="8,0,0,0" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                        <TextBlock Text="{Binding Path}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

@@ -1,0 +1,165 @@
+<UserControl x:Class="BaguetteAV.EDR.App.Views.PoliciesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:BaguetteAV.EDR.App.Converters"
+             Background="Transparent">
+    <UserControl.Resources>
+        <conv:ZeroToVisibilityConverter x:Key="ZeroVis" />
+    </UserControl.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="14" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid>
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="策略研究" Style="{StaticResource H3}" />
+                <TextBlock Text="把新的木马行为沉淀成可复用、可回滚的检测策略" Style="{StaticResource Caption}" Margin="0,2,0,0" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button Content="打开策略目录" Style="{StaticResource GhostButton}" Command="{Binding OpenPolicyFolderCommand}" />
+                <Button Content="刷新" Style="{StaticResource GhostButton}" Margin="8,0,0,0" Command="{Binding RefreshPoliciesCommand}" />
+                <Button Content="导入策略包" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0" Command="{Binding ImportPolicyCommand}" />
+            </StackPanel>
+        </Grid>
+
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+                <Border Style="{StaticResource Card}" Padding="0">
+                    <UniformGrid Columns="3" Height="82">
+                        <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0" Padding="18,0">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="已安装策略包" Style="{StaticResource Caption}" />
+                                <TextBlock Text="{Binding PolicyPacks.Count}" FontSize="24" FontWeight="SemiBold" Margin="0,2,0,0"
+                                           Foreground="{StaticResource TextPrimaryBrush}" />
+                                <TextBlock Text="本机策略仓库" Style="{StaticResource Caption}" Margin="0,1,0,0" />
+                            </StackPanel>
+                        </Border>
+                        <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0" Padding="18,0">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="已启用" Style="{StaticResource Caption}" />
+                                <TextBlock Text="{Binding ActivePolicyCount}" FontSize="24" FontWeight="SemiBold" Margin="0,2,0,0"
+                                           Foreground="{StaticResource AccentDarkBrush}" />
+                                <TextBlock Text="参与实时检测" Style="{StaticResource Caption}" Margin="0,1,0,0" />
+                            </StackPanel>
+                        </Border>
+                        <Border Padding="18,0">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="策略规则" Style="{StaticResource Caption}" />
+                                <TextBlock Text="{Binding ActivePolicyRuleCount}" FontSize="24" FontWeight="SemiBold" Margin="0,2,0,0"
+                                           Foreground="{StaticResource TextPrimaryBrush}" />
+                                <TextBlock Text="可由研究包扩展" Style="{StaticResource Caption}" Margin="0,1,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+                </Border>
+
+                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock Text="已安装策略" Style="{StaticResource H2}" />
+                        <TextBlock Text="{Binding PolicyStatusText}" Style="{StaticResource Caption}" Margin="0,4,0,0" />
+                        <ItemsControl ItemsSource="{Binding PolicyPacks}" Margin="0,10,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,14">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border CornerRadius="10" Padding="9,4" VerticalAlignment="Top" Margin="0,2,0,0">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="#F2F4F6" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Active}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="SemiBold">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Active}" Value="True">
+                                                                    <Setter Property="Foreground" Value="{StaticResource AccentDarkBrush}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="12,0,16,0">
+                                                <TextBlock Style="{StaticResource Body}" FontWeight="SemiBold">
+                                                    <Run Text="{Binding Name, Mode=OneWay}" /><Run Text="  " /><Run Text="{Binding Version, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}" />
+                                                </TextBlock>
+                                                <TextBlock Style="{StaticResource Caption}" Margin="0,2,0,0">
+                                                    <Run Text="{Binding RuleCount, Mode=OneWay}" /><Run Text=" 条规则 · " /><Run Text="{Binding Id, Mode=OneWay}" /><Run Text=" · sha256 " /><Run Text="{Binding Sha256Short, Mode=OneWay}" />
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding Description}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,3,0,0" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top">
+                                                <Button Content="{Binding ActionText}" Style="{StaticResource GhostButton}"
+                                                        Command="{Binding DataContext.TogglePolicyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}" />
+                                                <Button Content="回滚" Style="{StaticResource GhostButton}" Margin="6,0,0,0"
+                                                        IsEnabled="{Binding CanRollback}"
+                                                        Command="{Binding DataContext.RollbackPolicyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="尚未导入策略包。导入 JSON 后可在不重启引擎的情况下启用。" Style="{StaticResource Muted}" Margin="0,16,0,4"
+                                   Visibility="{Binding PolicyPacks.Count, Converter={StaticResource ZeroVis}}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="研究工作流" Style="{StaticResource H2}" />
+                            <TextBlock Text="采集事件样本 → 编写 JSON 策略 → 离线演练 → 校验 → 导入启用 → 命中后回滚或调阈值"
+                                       Style="{StaticResource Muted}" Margin="0,8,0,0" TextWrapping="Wrap" />
+                            <TextBlock Text="策略包只包含声明式条件，不允许执行任意代码；适合快速沉淀内核驱动、WMI、C2、注入等研究行为。"
+                                       Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="打开策略仓库" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center" Margin="20,0,0,0"
+                                Command="{Binding OpenPolicyFolderCommand}" />
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                    <StackPanel>
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="离线演练与样本闭环" Style="{StaticResource H2}" />
+                                <TextBlock Text="使用真实遥测样本验证规则命中，再决定是否导入；不会启动进程或修改系统。" Style="{StaticResource Caption}" Margin="0,4,0,0" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Button Content="导出实时样本" Style="{StaticResource GhostButton}" Command="{Binding ExportSamplesCommand}" />
+                                <Button Content="离线演练" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0" Command="{Binding SimulatePolicyCommand}" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Margin="0,12,0,0" Style="{StaticResource Caption}">
+                            <Run Text="当前可导出的实时样本：" /><Run Text="{Binding RecentSampleCount, Mode=OneWay}" FontWeight="SemiBold" />
+                        </TextBlock>
+                        <Border Background="{StaticResource SurfaceAltBrush}" CornerRadius="6" Padding="12" Margin="0,8,0,0">
+                            <TextBlock Text="{Binding PolicySimulationText}" Style="{StaticResource Body}" TextWrapping="Wrap" />
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

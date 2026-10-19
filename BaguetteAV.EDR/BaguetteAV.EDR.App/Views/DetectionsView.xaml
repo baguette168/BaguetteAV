@@ -1,0 +1,98 @@
+<UserControl x:Class="BaguetteAV.EDR.App.Views.DetectionsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:BaguetteAV.EDR.App.Converters"
+             Background="Transparent">
+    <UserControl.Resources>
+        <conv:SeverityBrushConverter x:Key="SeverityBrush" />
+        <conv:SeverityBackgroundConverter x:Key="SeverityBg" />
+        <conv:NullToVisibilityConverter x:Key="NotNull" />
+        <conv:InverseNullToVisibilityConverter x:Key="IsNull" />
+    </UserControl.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="14" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid>
+            <StackPanel Orientation="Horizontal">
+                <TextBox Width="260" Style="{StaticResource InputBox}" Text="{Binding DetectionSearch, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="按规则名称、进程或镜像路径搜索" />
+                <ComboBox Width="120" Margin="10,0,0,0" Style="{StaticResource EdrCombo}"
+                          ItemsSource="{Binding SeverityOptions}" SelectedItem="{Binding SeverityFilter}" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="导出 CSV" Style="{StaticResource SecondaryButton}" Command="{Binding ExportDetectionsCommand}" />
+                <Button Content="清空列表" Style="{StaticResource GhostButton}" Margin="8,0,0,0" Command="{Binding ClearDetectionsCommand}" />
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="340" />
+            </Grid.ColumnDefinitions>
+            <Border Style="{StaticResource Card}" Padding="8">
+                <DataGrid Style="{StaticResource EdrGrid}" ItemsSource="{Binding DetectionsView}" SelectedItem="{Binding SelectedDetection}" IsReadOnly="True">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="时间" Binding="{Binding TimeText, Mode=OneWay}" Width="96" />
+                        <DataGridTemplateColumn Header="等级" Width="76">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border Background="{Binding SeverityText, Converter={StaticResource SeverityBg}}" CornerRadius="10" Padding="8,3" HorizontalAlignment="Left">
+                                        <TextBlock Text="{Binding SeverityText}" Foreground="{Binding SeverityText, Converter={StaticResource SeverityBrush}}"
+                                                   FontSize="11" FontWeight="SemiBold" />
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="规则" Binding="{Binding RuleName, Mode=OneWay}" Width="180" />
+                        <DataGridTextColumn Header="进程" Binding="{Binding ProcessName, Mode=OneWay}" Width="130" />
+                        <DataGridTextColumn Header="PID" Binding="{Binding ProcessId, Mode=OneWay}" Width="58" />
+                        <DataGridTextColumn Header="父进程" Binding="{Binding ParentName, Mode=OneWay}" Width="110" />
+                        <DataGridTextColumn Header="镜像路径" Binding="{Binding ImagePath, Mode=OneWay}" Width="*" />
+                        <DataGridTextColumn Header="处置" Binding="{Binding Action, Mode=OneWay}" Width="120" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource Card}">
+                <Grid>
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="{Binding SelectedDetection, Converter={StaticResource IsNull}}">
+                        <TextBlock Text="未选择告警" Style="{StaticResource H3}" HorizontalAlignment="Center" />
+                        <TextBlock Text="在左侧列表中选择一条告警查看详情" Style="{StaticResource Caption}" Margin="0,6,0,0" HorizontalAlignment="Center" />
+                    </StackPanel>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding SelectedDetection, Converter={StaticResource NotNull}}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedDetection.RuleName}" Style="{StaticResource H2}" TextWrapping="Wrap" />
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <Border Background="{Binding SelectedDetection.SeverityText, Converter={StaticResource SeverityBg}}" CornerRadius="10" Padding="8,3">
+                                    <TextBlock Text="{Binding SelectedDetection.SeverityText}" Foreground="{Binding SelectedDetection.SeverityText, Converter={StaticResource SeverityBrush}}" FontSize="11" FontWeight="SemiBold" />
+                                </Border>
+                                <TextBlock Text="{Binding SelectedDetection.Score, StringFormat=评分 {0}}" Style="{StaticResource Caption}" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding SelectedDetection.Mitre}" Style="{StaticResource Caption}" Margin="10,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding SelectedDetection.Description}" Style="{StaticResource Body}" TextWrapping="Wrap" Margin="0,14,0,0" />
+                            <TextBlock Text="进程" Style="{StaticResource Caption}" Margin="0,16,0,2" />
+                            <TextBlock Text="{Binding SelectedDetection.ProcessName}" Style="{StaticResource Body}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding SelectedDetection.ImagePath}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,3,0,0" />
+                            <TextBlock Text="命令行" Style="{StaticResource Caption}" Margin="0,12,0,2" />
+                            <TextBlock Text="{Binding SelectedDetection.CommandLine}" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+                            <TextBlock Text="SHA256" Style="{StaticResource Caption}" Margin="0,12,0,2" />
+                            <TextBlock Text="{Binding SelectedDetection.Sha256}" Style="{StaticResource Caption}" TextWrapping="Wrap" FontFamily="Consolas" />
+                            <TextBlock Text="处置" Style="{StaticResource Caption}" Margin="0,12,0,2" />
+                            <TextBlock Text="{Binding SelectedDetection.Action}" Style="{StaticResource Body}" Foreground="{StaticResource AccentDarkBrush}" />
+                            <StackPanel Margin="0,18,0,0">
+                                <Button Content="终止进程" Style="{StaticResource DangerButton}" Command="{Binding KillDetectionProcessCommand}" HorizontalAlignment="Stretch" />
+                                <Button Content="隔离文件" Style="{StaticResource SecondaryButton}" Margin="0,8,0,0" Command="{Binding QuarantineDetectionCommand}" HorizontalAlignment="Stretch" />
+                                <Button Content="标记为误报" Style="{StaticResource GhostButton}" Margin="0,4,0,0" Command="{Binding MarkFalsePositiveCommand}" HorizontalAlignment="Stretch" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "id": "research.kernel-malware.baseline",
+  "name": "内核马研究基线",
+  "version": "1.0.2",
+  "author": "B-EDR Lab",
+  "description": "面向内核马研究链的声明式策略：驱动落地、WMI 持久化、C2 外联、LSASS 访问与远程线程。",
+  "minEngineVersion": "2.0.0",
+  "tags": ["kernel", "rootkit", "c2", "research"],
+  "rules": [
+    {
+      "id": "RESEARCH-DRV-001",
+      "name": "用户目录驱动落地",
+      "description": "用户可写目录出现 .sys 文件，常见于脆弱驱动或内核马投放。",
+      "mitre": "T1014",
+      "severity": "High",
+      "score": 24,
+      "eventKinds": ["FileCreate"],
+      "condition": {
+        "all": [
+          { "field": "file.path", "op": "endswith", "value": ".sys" },
+          { "field": "file.userwritable", "op": "eq", "value": "true" }
+        ]
+      }
+    },
+    {
+      "id": "RESEARCH-DRV-002",
+      "name": "未签名驱动加载",
+      "description": "加载未签名驱动，且驱动路径位于用户可写目录。",
+      "mitre": "T1543.003",
+      "severity": "Critical",
+      "score": 30,
+      "response": "contain",
+      "eventKinds": ["DriverLoad"],
+      "condition": {
+        "all": [
+          { "field": "driver.userwritable", "op": "eq", "value": "true" },
+          {
+            "any": [
+              { "field": "driver.signed", "op": "eq", "value": "false" },
+              { "field": "process.signed", "op": "eq", "value": "false" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "RESEARCH-WMI-001",
+      "name": "WMI 事件订阅持久化",
+      "description": "WMI 过滤器、消费者或绑定中出现命令执行特征。",
+      "mitre": "T1546.003",
+      "severity": "High",
+      "score": 26,
+      "response": "terminate_process",
+      "eventKinds": ["WmiFilter", "WmiConsumer", "WmiBinding"],
+      "condition": {
+        "any": [
+          { "field": "wmi.query", "op": "regex", "value": "(?i)(powershell|cmd\\.exe|wscript|cscript|mshta)" },
+          { "field": "wmi.destination", "op": "regex", "value": "(?i)(powershell|cmd\\.exe|wscript|cscript|mshta)" },
+          { "field": "wmi.consumer.type", "op": "eq", "value": "CommandLineEventConsumer" }
+        ]
+      }
+    },
+    {
+      "id": "RESEARCH-C2-001",
+      "name": "C2 端口外联",
+      "description": "连接到研究环境中的 C2 端口。",
+      "mitre": "T1071",
+      "severity": "Critical",
+      "score": 30,
+      "response": "block_destination",
+      "eventKinds": ["NetworkConnect"],
+      "condition": {
+        "field": "network.destination.port",
+        "op": "in",
+        "value": [8443, 31337]
+      }
+    },
+    {
+      "id": "RESEARCH-LSASS-001",
+      "name": "LSASS 高权限访问",
+      "description": "进程以凭据转储常见访问掩码打开 LSASS。",
+      "mitre": "T1003.001",
+      "severity": "Critical",
+      "score": 32,
+      "response": "terminate_process",
+      "eventKinds": ["ProcessAccess"],
+      "condition": {
+        "all": [
+          { "field": "target.image", "op": "endswith", "value": "lsass.exe" },
+          { "field": "target.access", "op": "regex", "value": "(?i)0x(1010|1410|1fffff|143a)" }
+        ]
+      }
+    },
+    {
+      "id": "RESEARCH-INJECT-001",
+      "name": "远程线程注入",
+      "description": "向浏览器或 LSASS 创建远程线程。",
+      "mitre": "T1055",
+      "severity": "High",
+      "score": 28,
+      "response": "terminate_process",
+      "eventKinds": ["RemoteThread"],
+      "condition": {
+        "field": "target.image",
+        "op": "regex",
+        "value": "(?i)(explorer|lsass|chrome|msedge|firefox)\\.exe$"
+      }
+    }
+  ]
+}

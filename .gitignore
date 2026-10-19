@@ -26,3 +26,15 @@ Release/
 # 备份
 *_backup/
 *.bak
+
+# .NET / B-EDR 构建产物
+[Bb]in/
+[Oo]bj/
+TestResults/
+.vs/
+*.user
+*.suo
+*.log
+*.pdb
+*.cache
+artifacts/

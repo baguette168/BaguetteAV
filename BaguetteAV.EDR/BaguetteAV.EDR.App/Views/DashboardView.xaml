@@ -1,0 +1,237 @@
+<UserControl x:Class="BaguetteAV.EDR.App.Views.DashboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:BaguetteAV.EDR.App.Converters"
+             Background="Transparent">
+    <UserControl.Resources>
+        <conv:BoolToBrushConverter x:Key="BoolBrush" />
+        <conv:ZeroToVisibilityConverter x:Key="ZeroVis" />
+        <conv:SeverityBrushConverter x:Key="SeverityBrush" />
+        <Style x:Key="HeroIconBadge" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource WarningSoftBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsProtected}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="HeroIconGlyph" TargetType="TextBlock">
+            <Setter Property="Text" Value="&#xE7BA;" />
+            <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsProtected}" Value="True">
+                    <Setter Property="Text" Value="&#xE83D;" />
+                    <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="HeroTitle" TargetType="TextBlock">
+            <Setter Property="Text" Value="防护已暂停" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsProtected}" Value="True">
+                    <Setter Property="Text" Value="设备已受保护" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="HeroSubtitle" TargetType="TextBlock" BasedOn="{StaticResource Muted}">
+            <Setter Property="Text" Value="引擎未运行，实时检测与自动处置当前不可用。" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsProtected}" Value="True">
+                    <Setter Property="Text" Value="实时行为检测、C2 外联阻断与内核组件检查均已启用。" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ComponentState" TargetType="TextBlock">
+            <Setter Property="Text" Value="已暂停" />
+            <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsProtected}" Value="True">
+                    <Setter Property="Text" Value="运行中" />
+                    <Setter Property="Foreground" Value="{StaticResource AccentDarkBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel>
+            <Border Style="{StaticResource Card}" Padding="18,14">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="38" Height="38" CornerRadius="19" Style="{StaticResource HeroIconBadge}" VerticalAlignment="Center">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="17" Style="{StaticResource HeroIconGlyph}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                            <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"
+                                       Style="{StaticResource HeroTitle}" />
+                            <TextBlock Style="{StaticResource HeroSubtitle}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                        <Button Content="快速扫描" Style="{StaticResource PrimaryButton}" Command="{Binding QuickScanCommand}" />
+                        <Button Content="查看告警" Style="{StaticResource SecondaryButton}" Margin="8,0,0,0"
+                                Command="{Binding NavigateCommand}" CommandParameter="detections" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource Card}" Padding="0" Margin="0,12,0,0">
+                <UniformGrid Columns="4" Height="86">
+                    <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0" Padding="18,0">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="威胁总数" Style="{StaticResource Caption}" />
+                            <TextBlock Text="{Binding ThreatCount}" FontSize="24" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}" Margin="0,2,0,0" />
+                            <TextBlock Text="当前未处置告警" Style="{StaticResource Caption}" Margin="0,1,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0" Padding="18,0">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="监控事件" Style="{StaticResource Caption}" />
+                            <TextBlock Text="{Binding EventCountText}" FontSize="24" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}" Margin="0,2,0,0" />
+                            <TextBlock Text="自本次启动累计" Style="{StaticResource Caption}" Margin="0,1,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0" Padding="18,0">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="已阻断" Style="{StaticResource Caption}" />
+                            <TextBlock Text="{Binding BlockedCountText}" FontSize="24" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}" Margin="0,2,0,0" />
+                            <TextBlock Text="终止进程 / 阻断外联" Style="{StaticResource Caption}" Margin="0,1,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border Padding="18,0">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="启用规则" Style="{StaticResource Caption}" />
+                            <TextBlock Text="{Binding RuleCountText}" FontSize="24" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}" Margin="0,2,0,0" />
+                            <TextBlock Text="已启用 / 总规则" Style="{StaticResource Caption}" Margin="0,1,0,0" />
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+            </Border>
+
+            <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.15*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="1*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Style="{StaticResource Card}" Padding="0">
+                    <StackPanel>
+                        <Border Padding="16,12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+                            <Grid>
+                                <TextBlock Text="防护组件" Style="{StaticResource H2}" />
+                                <TextBlock Text="实时" Style="{StaticResource Caption}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <Grid Height="52" Margin="16,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="30" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="&#xE9D9;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                       Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="行为检测" Style="{StaticResource Body}" />
+                                <TextBlock Text="Sysmon 事件与 WMI 血缘分析" Style="{StaticResource Caption}" Margin="0,1,0,0" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Style="{StaticResource ComponentState}" VerticalAlignment="Center" />
+                        </Grid>
+                        <Border Height="1" Background="#F0F2F4" Margin="16,0" />
+                        <Grid Height="52" Margin="16,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="30" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="&#xE774;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                       Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="网络防护" Style="{StaticResource Body}" />
+                                <TextBlock Text="8443 端口与 IOC 目标外联拦截" Style="{StaticResource Caption}" Margin="0,1,0,0" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Style="{StaticResource ComponentState}" VerticalAlignment="Center" />
+                        </Grid>
+                        <Border Height="1" Background="#F0F2F4" Margin="16,0" />
+                        <Grid Height="52" Margin="16,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="30" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="&#xE7F8;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                       Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="驱动防护" Style="{StaticResource Body}" />
+                                <TextBlock Text="用户目录驱动落地与脆弱驱动加载" Style="{StaticResource Caption}" Margin="0,1,0,0" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Style="{StaticResource ComponentState}" VerticalAlignment="Center" />
+                        </Grid>
+                        <Border Height="1" Background="#F0F2F4" Margin="16,0" />
+                        <Grid Height="52" Margin="16,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="30" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="&#xE7BA;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                       Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="持久化防护" Style="{StaticResource Body}" />
+                                <TextBlock Text="WMI 事件订阅、启动项与服务创建" Style="{StaticResource Caption}" Margin="0,1,0,0" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="2" Style="{StaticResource ComponentState}" VerticalAlignment="Center" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource Card}" Padding="0">
+                    <StackPanel>
+                        <Border Padding="16,12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+                            <Grid>
+                                <TextBlock Text="最近告警" Style="{StaticResource H2}" />
+                                <Button Content="全部" Style="{StaticResource GhostButton}" HorizontalAlignment="Right"
+                                        Command="{Binding NavigateCommand}" CommandParameter="detections" />
+                            </Grid>
+                        </Border>
+                        <TextBlock Text="暂无告警，设备状态良好" Style="{StaticResource Muted}" Margin="16,14" 
+                                   Visibility="{Binding ThreatCount, Converter={StaticResource ZeroVis}}" />
+                        <ItemsControl ItemsSource="{Binding RecentDetections}" Margin="0,2,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Height="46" Margin="16,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Ellipse Width="7" Height="7" Fill="{Binding SeverityText, Converter={StaticResource SeverityBrush}}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Margin="9,0,8,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding RuleName}" Style="{StaticResource Body}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Style="{StaticResource Caption}" Margin="0,1,0,0">
+                <Run Text="{Binding ProcessName, Mode=OneWay}" /><Run Text="  ·  " /><Run Text="{Binding TimeText, Mode=OneWay}" />
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{Binding SeverityText}"
+                                                   Foreground="{Binding SeverityText, Converter={StaticResource SeverityBrush}}"
+                                                   FontSize="11" VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

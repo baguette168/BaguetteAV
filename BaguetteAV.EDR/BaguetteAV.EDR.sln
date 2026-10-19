@@ -1,0 +1,52 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BaguetteAV.EDR.Core", "BaguetteAV.EDR.Core\BaguetteAV.EDR.Core.csproj", "{A79AD64B-E6FF-4DA7-8227-B9376EDEF9F4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BaguetteAV.EDR.App", "BaguetteAV.EDR.App\BaguetteAV.EDR.App.csproj", "{73FF5956-A3BE-4AC8-BCC3-95CF8AB5BCC1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BaguetteAV.EDR.Service", "BaguetteAV.EDR.Service\BaguetteAV.EDR.Service.csproj", "{03D642BC-D6DD-45F8-8C14-695F04D5378F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BaguetteAV.EDR.PolicyTool", "BaguetteAV.EDR.PolicyTool\BaguetteAV.EDR.PolicyTool.csproj", "{3FA87B5D-929E-4846-BC3B-6D5B74042BA5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BaguetteAV.EDR.Plugin.Sample", "BaguetteAV.EDR.Plugin.Sample\BaguetteAV.EDR.Plugin.Sample.csproj", "{3FCD6DCE-1E85-4E08-90AB-9132F2310F2A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BaguetteAV.EDR.Tests", "BaguetteAV.EDR.Tests\BaguetteAV.EDR.Tests.csproj", "{8B5A8BD7-43AF-49AB-85EE-1DA05579B980}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A79AD64B-E6FF-4DA7-8227-B9376EDEF9F4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A79AD64B-E6FF-4DA7-8227-B9376EDEF9F4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A79AD64B-E6FF-4DA7-8227-B9376EDEF9F4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A79AD64B-E6FF-4DA7-8227-B9376EDEF9F4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{73FF5956-A3BE-4AC8-BCC3-95CF8AB5BCC1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{73FF5956-A3BE-4AC8-BCC3-95CF8AB5BCC1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{73FF5956-A3BE-4AC8-BCC3-95CF8AB5BCC1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{73FF5956-A3BE-4AC8-BCC3-95CF8AB5BCC1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{03D642BC-D6DD-45F8-8C14-695F04D5378F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{03D642BC-D6DD-45F8-8C14-695F04D5378F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{03D642BC-D6DD-45F8-8C14-695F04D5378F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{03D642BC-D6DD-45F8-8C14-695F04D5378F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3FA87B5D-929E-4846-BC3B-6D5B74042BA5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3FA87B5D-929E-4846-BC3B-6D5B74042BA5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3FA87B5D-929E-4846-BC3B-6D5B74042BA5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3FA87B5D-929E-4846-BC3B-6D5B74042BA5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3FCD6DCE-1E85-4E08-90AB-9132F2310F2A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3FCD6DCE-1E85-4E08-90AB-9132F2310F2A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3FCD6DCE-1E85-4E08-90AB-9132F2310F2A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3FCD6DCE-1E85-4E08-90AB-9132F2310F2A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8B5A8BD7-43AF-49AB-85EE-1DA05579B980}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8B5A8BD7-43AF-49AB-85EE-1DA05579B980}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8B5A8BD7-43AF-49AB-85EE-1DA05579B980}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8B5A8BD7-43AF-49AB-85EE-1DA05579B980}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

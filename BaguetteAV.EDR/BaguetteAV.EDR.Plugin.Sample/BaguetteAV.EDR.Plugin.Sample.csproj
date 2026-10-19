@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>BaguetteAV.EDR.Plugin.Sample</AssemblyName>
+    <RootNamespace>BaguetteAV.EDR.Plugin.Sample</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BaguetteAV.EDR.Core\BaguetteAV.EDR.Core.csproj" />
+  </ItemGroup>
+</Project>
