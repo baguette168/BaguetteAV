@@ -45,6 +45,9 @@ public sealed class PolicyRepository
         {
             try
             {
+                if (!TryPrepareAudit(out var auditError))
+                    return new PolicyImportResult(false, string.Concat("审计日志不可写，拒绝导入策略：", auditError), null, validation);
+
                 var hash = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
                 var folder = Path.Combine(InstalledDirectory, pack.Id, pack.Version);
                 var policyPath = Path.Combine(folder, "policy.json");
@@ -160,6 +163,7 @@ public sealed class PolicyRepository
     {
         lock (_gate)
         {
+            if (!TryPrepareAudit(out _)) return false;
             var state = LoadState();
             if (!state.Packs.TryGetValue(id, out var entry)) return false;
             if (string.IsNullOrWhiteSpace(version))
@@ -184,6 +188,7 @@ public sealed class PolicyRepository
     {
         lock (_gate)
         {
+            if (!TryPrepareAudit(out _)) return false;
             var state = LoadState();
             if (!state.Packs.TryGetValue(id, out var entry) || string.IsNullOrWhiteSpace(entry.Previous)) return false;
             var target = entry.Previous;
@@ -200,6 +205,7 @@ public sealed class PolicyRepository
     {
         lock (_gate)
         {
+            if (!TryPrepareAudit(out _)) return false;
             var state = LoadState();
             if (state.Packs.TryGetValue(id, out var entry) &&
                 string.Equals(entry.Active, version, StringComparison.OrdinalIgnoreCase))
@@ -325,26 +331,39 @@ public sealed class PolicyRepository
         }
     }
 
-    private void Audit(string action, string id, string version, string sha256 = "")
+    private bool TryPrepareAudit(out string error)
     {
+        error = string.Empty;
         try
         {
             Directory.CreateDirectory(_root);
-            var entry = new
-            {
-                timestamp = DateTimeOffset.Now.ToString("O"),
-                action,
-                policyId = id,
-                version,
-                sha256,
-                user = Environment.UserName,
-                machine = Environment.MachineName
-            };
-            File.AppendAllText(AuditPath,
-                string.Concat(JsonSerializer.Serialize(entry), Environment.NewLine),
-                new System.Text.UTF8Encoding(false));
+            using var stream = new FileStream(
+                AuditPath, FileMode.Append, FileAccess.Write, FileShare.Read);
+            return true;
         }
-        catch { }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private void Audit(string action, string id, string version, string sha256 = "")
+    {
+        Directory.CreateDirectory(_root);
+        var entry = new
+        {
+            timestamp = DateTimeOffset.Now.ToString("O"),
+            action,
+            policyId = id,
+            version,
+            sha256,
+            user = Environment.UserName,
+            machine = Environment.MachineName
+        };
+        File.AppendAllText(AuditPath,
+            string.Concat(JsonSerializer.Serialize(entry), Environment.NewLine),
+            new System.Text.UTF8Encoding(false));
     }
 
     private PolicyState LoadState()

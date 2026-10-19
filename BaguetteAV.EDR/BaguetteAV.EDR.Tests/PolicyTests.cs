@@ -448,6 +448,20 @@ public sealed class PolicyTests : IDisposable
         Assert.Contains("research.kernel.baseline", audit);
     }
 
+    [Fact]
+    public void InstallFailsClosedWhenAuditTrailIsNotWritable()
+    {
+        var repository = new PolicyRepository(_root);
+        Directory.CreateDirectory(repository.AuditPath);
+
+        var result = repository.Install(KernelPack, "fail-closed.json", activate: true);
+
+        Assert.False(result.Success);
+        Assert.Contains("审计日志不可写", result.Message);
+        Assert.False(Directory.Exists(Path.Combine(
+            repository.InstalledDirectory, "research.kernel.baseline", "1.0.0")));
+    }
+
     public void Dispose()
     {
         try { if (Directory.Exists(_root)) Directory.Delete(_root, true); } catch { }
