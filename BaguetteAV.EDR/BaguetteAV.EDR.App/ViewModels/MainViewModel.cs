@@ -43,6 +43,15 @@ public sealed class PolicyPackItem : ObservableObject
     public int RuleCount { get; init; }
     public string Sha256Short { get; init; } = string.Empty;
     public string ImportedAtText { get; init; } = string.Empty;
+    public string Publisher { get; init; } = string.Empty;
+    public bool SignatureVerified { get; init; }
+    public int TestCaseCount { get; init; }
+    public int TestPassedCount { get; init; }
+    public string RiskLevel { get; init; } = string.Empty;
+    public List<string> Capabilities { get; init; } = new();
+    public string LoadError { get; init; } = string.Empty;
+    public bool HasLoadError => !string.IsNullOrEmpty(LoadError);
+    public bool EffectiveActive => Active && !HasLoadError;
     public bool Active
     {
         get => _active;
@@ -53,9 +62,24 @@ public sealed class PolicyPackItem : ObservableObject
             OnPropertyChanged(nameof(ActionText));
         }
     }
-    public string StatusText => Active ? "已启用" : "未启用";
+    public string StatusText => HasLoadError ? "加载被拒绝" : Active ? "已启用" : "未启用";
     public string ActionText => Active ? "停用" : "启用";
+    public string TrustText => SignatureVerified
+        ? string.Concat("已验签 · ", Publisher)
+        : "本机JSON · 未签名";
+    public string VerificationText => TestCaseCount > 0
+        ? string.Concat("回归 ", TestPassedCount, "/", TestCaseCount, " · 风险 ", RiskLevel)
+        : "未附回归集";
     public bool CanRollback { get; init; }
+}
+
+public sealed class TrustedPublisherItem
+{
+    public string Name { get; init; } = string.Empty;
+    public string KeyId { get; init; } = string.Empty;
+    public string KeyIdShort => KeyId.Length > 16 ? KeyId[..16] : KeyId;
+    public string Algorithm { get; init; } = string.Empty;
+    public string TrustedAtText { get; init; } = string.Empty;
 }
 
 public sealed class MainViewModel : ObservableObject, IDisposable
@@ -83,6 +107,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private string _policySimulationText = "尚未执行离线演练";
     private string _policyCoverageText = "尚未分析策略覆盖";
     private string _policyTestText = "尚未运行策略回归测试";
+    private string _trustStatusText = "尚未信任任何策略发布者";
     private int _recentSampleCount;
     private string _clamAvStatus = "未配置";
     private CancellationTokenSource? _scanCts;
@@ -141,6 +166,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public ObservableCollection<ScanFinding> ScanFindings { get; } = new();
     public ObservableCollection<RootkitFinding> RootkitFindings { get; } = new();
     public ObservableCollection<PolicyPackItem> PolicyPacks { get; } = new();
+    public ObservableCollection<TrustedPublisherItem> TrustedPublishers { get; } = new();
     public IReadOnlyList<string> SeverityOptions { get; } = new[] { "全部", "严重", "高危", "中危", "低危" };
 
     public RelayCommand NavigateCommand { get; private set; } = null!;
@@ -165,6 +191,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public RelayCommand OpenLogFolderCommand { get; private set; } = null!;
     public RelayCommand QuickScanCommand { get; private set; } = null!;
     public RelayCommand ImportPolicyCommand { get; private set; } = null!;
+    public RelayCommand TrustPublisherCommand { get; private set; } = null!;
+    public RelayCommand RevokePublisherCommand { get; private set; } = null!;
     public RelayCommand RefreshPoliciesCommand { get; private set; } = null!;
     public RelayCommand TogglePolicyCommand { get; private set; } = null!;
     public RelayCommand RollbackPolicyCommand { get; private set; } = null!;
@@ -277,9 +305,10 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     public string PolicySimulationText { get => _policySimulationText; private set => SetProperty(ref _policySimulationText, value); }
     public string PolicyCoverageText { get => _policyCoverageText; private set => SetProperty(ref _policyCoverageText, value); }
     public string PolicyTestText { get => _policyTestText; private set => SetProperty(ref _policyTestText, value); }
+    public string TrustStatusText { get => _trustStatusText; private set => SetProperty(ref _trustStatusText, value); }
     public int RecentSampleCount { get => _recentSampleCount; private set => SetProperty(ref _recentSampleCount, value); }
-    public int ActivePolicyCount => PolicyPacks.Count(p => p.Active);
-    public int ActivePolicyRuleCount => PolicyPacks.Where(p => p.Active).Sum(p => p.RuleCount);
+    public int ActivePolicyCount => PolicyPacks.Count(p => p.EffectiveActive);
+    public int ActivePolicyRuleCount => PolicyPacks.Where(p => p.EffectiveActive).Sum(p => p.RuleCount);
     public bool AutoContain { get => _autoContain; set => SetProperty(ref _autoContain, value); }
     public bool AutoQuarantine { get => _autoQuarantine; set => SetProperty(ref _autoQuarantine, value); }
     public bool BlockC2 { get => _blockC2; set => SetProperty(ref _blockC2, value); }
@@ -340,6 +369,8 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         OpenLogFolderCommand = new RelayCommand(_ => OpenFolder(SettingsStore.DataDirectory));
         QuickScanCommand = new RelayCommand(_ => { Navigate("scan"); _ = RunScanAsync("quick"); });
         ImportPolicyCommand = new RelayCommand(_ => ImportPolicy());
+        TrustPublisherCommand = new RelayCommand(_ => TrustPublisher());
+        RevokePublisherCommand = new RelayCommand(p => RevokePublisher(p as TrustedPublisherItem));
         RefreshPoliciesCommand = new RelayCommand(_ => { RefreshPolicies(); RefreshRuleList(); });
         TogglePolicyCommand = new RelayCommand(p => TogglePolicy(p as PolicyPackItem));
         RollbackPolicyCommand = new RelayCommand(p => RollbackPolicy(p as PolicyPackItem));
@@ -359,7 +390,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         using var dialog = new Forms.OpenFileDialog
         {
             Title = "导入 B-EDR 策略包",
-            Filter = "B-EDR 策略包|*.json|JSON 文件|*.json",
+            Filter = "B-EDR 签名策略包|*.bedrpack|JSON 策略|*.json|所有文件|*.*",
             CheckFileExists = true,
             Multiselect = false
         };
@@ -371,7 +402,12 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             System.Windows.MessageBox.Show(text, "策略导入失败", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-        var result = _runtime.Policies.InstallFromFile(dialog.FileName, activate: true);
+        var isPackage = string.Equals(
+            Path.GetExtension(dialog.FileName), ".bedrpack",
+            StringComparison.OrdinalIgnoreCase);
+        var result = isPackage
+            ? _runtime.Policies.InstallPackageFromFile(dialog.FileName, activate: true)
+            : _runtime.Policies.InstallFromFile(dialog.FileName, activate: true);
         if (!result.Success)
         {
             var details = result.Validation?.Errors.Take(6).ToArray() ?? Array.Empty<string>();
@@ -385,6 +421,87 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         RefreshPolicies();
         PolicyStatusText = result.Message;
         StatusMessage = result.Message;
+        if (result.Inspection is { Success: true } inspection)
+        {
+            PolicyTestText = string.Concat(
+                "策略包回归 ", inspection.TestResult?.PassedCount, "/", inspection.TestResult?.CaseCount,
+                "，规则覆盖 ", inspection.CoveredEnabledRuleCount, "/", inspection.EnabledRuleCount,
+                "，风险 ", inspection.RiskLevel);
+            System.Windows.MessageBox.Show(
+                string.Concat(
+                    "发布者：", inspection.PublisherName, Environment.NewLine,
+                    "签名：已验证", Environment.NewLine,
+                    "回归：", inspection.TestResult?.PassedCount, "/", inspection.TestResult?.CaseCount, Environment.NewLine,
+                    "规则覆盖：", inspection.CoveredEnabledRuleCount, "/", inspection.EnabledRuleCount, Environment.NewLine,
+                    "风险：", inspection.RiskLevel, Environment.NewLine,
+                    "能力：", string.Join(", ", inspection.Capabilities)),
+                "策略包已验收",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+    }
+
+    private void TrustPublisher()
+    {
+        using var dialog = new Forms.OpenFileDialog
+        {
+            Title = "信任策略发布者公钥",
+            Filter = "P-256 公钥|*.pem|所有文件|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog() != Forms.DialogResult.OK) return;
+        if (!DataDirectorySecurity.TryHarden(SettingsStore.DataDirectory, out var aclError))
+        {
+            PolicyStatusText = string.Concat("数据目录权限加固失败：", aclError);
+            return;
+        }
+        var result = new PolicyTrustStore(_runtime.Policies.Root)
+            .ImportPublicKey(dialog.FileName);
+        if (result.Success) RefreshPublishers();
+        PolicyStatusText = result.Message;
+        StatusMessage = result.Message;
+        System.Windows.MessageBox.Show(
+            result.Message,
+            result.Success ? "发布者已信任" : "公钥导入失败",
+            MessageBoxButton.OK,
+            result.Success ? MessageBoxImage.Information : MessageBoxImage.Warning);
+    }
+
+    private void RevokePublisher(TrustedPublisherItem? item)
+    {
+        if (item is null) return;
+        var confirmation = System.Windows.MessageBox.Show(
+            string.Concat(
+                "撤销发布者“", item.Name, "”的本机信任？", Environment.NewLine, Environment.NewLine,
+                "撤销后，该发布者签名的活动策略会在下次热加载时被拒绝；", Environment.NewLine,
+                "已安装文件和审计记录不会被删除。"),
+            "撤销发布者信任",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirmation != MessageBoxResult.Yes) return;
+        if (!DataDirectorySecurity.TryHarden(SettingsStore.DataDirectory, out var aclError))
+        {
+            PolicyStatusText = string.Concat("数据目录权限加固失败：", aclError);
+            return;
+        }
+
+        var result = new PolicyTrustStore(_runtime.Policies.Root).RemovePublisher(item.KeyId);
+        if (!result.Success)
+        {
+            PolicyStatusText = result.Message;
+            System.Windows.MessageBox.Show(result.Message, "撤销失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        _runtime.ReloadPolicies();
+        RefreshRuleList();
+        RefreshPolicies();
+        var rejected = _runtime.PolicyErrors.Count;
+        PolicyStatusText = rejected > 0
+            ? string.Concat(result.Message, "；", rejected, " 个策略因信任失效被拒绝加载")
+            : result.Message;
+        StatusMessage = PolicyStatusText;
     }
 
     private void RefreshPolicies()
@@ -403,19 +520,52 @@ public sealed class MainViewModel : ObservableObject, IDisposable
                 Active = policy.Active,
                 CanRollback = policy.CanRollback,
                 Sha256Short = policy.Sha256.Length > 12 ? policy.Sha256[..12] : policy.Sha256,
-                ImportedAtText = policy.ImportedAt.ToString("yyyy-MM-dd HH:mm")
+                ImportedAtText = policy.ImportedAt.ToString("yyyy-MM-dd HH:mm"),
+                Publisher = policy.Publisher,
+                SignatureVerified = policy.SignatureVerified,
+                TestCaseCount = policy.TestCaseCount,
+                TestPassedCount = policy.TestPassedCount,
+                RiskLevel = policy.RiskLevel,
+                Capabilities = policy.Capabilities,
+                LoadError = policy.LoadError
             });
         }
-        var active = PolicyPacks.Count(p => p.Active);
+        var active = PolicyPacks.Count(p => p.EffectiveActive);
+        var blocked = PolicyPacks.Count(p => p.HasLoadError);
         var errors = _runtime.PolicyErrors.Count;
         OnPropertyChanged(nameof(ActivePolicyCount));
         OnPropertyChanged(nameof(ActivePolicyRuleCount));
         PolicyStatusText = string.Concat("已安装 ", PolicyPacks.Count, " 个策略包，", active, " 个已启用");
-        if (errors > 0) PolicyStatusText = string.Concat(PolicyStatusText, "，", errors, " 个加载错误");
+        if (blocked > 0)
+            PolicyStatusText = string.Concat(PolicyStatusText, "，", blocked, " 个策略被拒绝加载");
+        else if (errors > 0)
+            PolicyStatusText = string.Concat(PolicyStatusText, "，", errors, " 个加载错误");
         var bundle = _runtime.Policies.LoadActive();
         var coverage = PolicyCoverageAnalyzer.Analyze(
             bundle.Packs, bundle.Errors);
         PolicyCoverageText = coverage.Summary;
+        RefreshPublishers();
+    }
+
+    private void RefreshPublishers()
+    {
+        TrustedPublishers.Clear();
+        var publishers = new PolicyTrustStore(_runtime.Policies.Root).List(out var error);
+        foreach (var publisher in publishers)
+        {
+            TrustedPublishers.Add(new TrustedPublisherItem
+            {
+                Name = publisher.Name,
+                KeyId = publisher.KeyId,
+                Algorithm = publisher.Algorithm,
+                TrustedAtText = publisher.TrustedAt.ToString("yyyy-MM-dd HH:mm")
+            });
+        }
+        TrustStatusText = error.Length > 0
+            ? string.Concat("信任清单不可用：", error)
+            : publishers.Count == 0
+                ? "尚未信任任何策略发布者"
+                : string.Concat("本机信任根中有 ", publishers.Count, " 个发布者；撤销后相关策略会立即失效");
     }
 
     private void TogglePolicy(PolicyPackItem? item)

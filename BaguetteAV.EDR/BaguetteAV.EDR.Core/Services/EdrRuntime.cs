@@ -297,15 +297,64 @@ public sealed class EdrRuntime : IDisposable
 
     private async Task ProcessLoopAsync(CancellationToken token)
     {
+        var restarts = 0;
+        while (!token.IsCancellationRequested)
+        {
+            var startedAt = Environment.TickCount64;
+            try
+            {
+                await ProcessLoopCoreAsync(token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(string.Concat("EVT-LOOP-FAILED: ", ex.GetType().Name, ": ", ex.Message));
+            }
+            if (token.IsCancellationRequested) return;
+            var elapsedMs = Environment.TickCount64 - startedAt;
+            restarts = elapsedMs < 2000 ? restarts + 1 : 0;
+            if (restarts >= 20)
+            {
+                Log.Error("EVT-LOOP-BREAKER-OPEN: worker exited repeatedly, giving up until next Start()");
+                return;
+            }
+            Log.Warn(string.Concat("EVT-LOOP-RESTART: worker exited after ", elapsedMs, " ms, restart #", restarts));
+            try
+            {
+                await Task.Delay(Math.Min(5000, 250 * (restarts + 1)), token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+        }
+    }
+
+    private async Task ProcessLoopCoreAsync(CancellationToken token)
+    {
         if (_channel is null) return;
         try
         {
             await foreach (var telemetry in _channel.Reader.ReadAllAsync(token))
             {
-                Interlocked.Increment(ref _eventCount);
-                if (!Settings.ProtectionEnabled) continue;
-                await EvaluateAsync(telemetry, token);
-                if (EventCount % 20 == 0) StateChanged?.Invoke();
+                try
+                {
+                    Interlocked.Increment(ref _eventCount);
+                    if (!Settings.ProtectionEnabled) continue;
+                    await EvaluateAsync(telemetry, token);
+                    if (EventCount % 20 == 0) StateChanged?.Invoke();
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (Exception eventError)
+                {
+                    Log.Error(string.Concat("EVT-EVAL-FAILED: ", eventError.GetType().Name, ": ", eventError.Message));
+                }
             }
         }
         catch (OperationCanceledException) { }

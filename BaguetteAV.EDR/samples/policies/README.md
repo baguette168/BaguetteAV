@@ -9,6 +9,13 @@ dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -
 dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -- simulate .\lab\BaguetteAV\BaguetteAV.EDR\samples\policies\kernel-research.policy.json .\lab\BaguetteAV\BaguetteAV.EDR\samples\policies\kernel-research.events.json
 dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -- test .\lab\BaguetteAV\BaguetteAV.EDR\samples\policies\kernel-research.policy.json .\lab\BaguetteAV\BaguetteAV.EDR\samples\policies\kernel-research.tests.json
 dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -- coverage --policy .\lab\BaguetteAV\BaguetteAV.EDR\samples\policies\kernel-research.policy.json --markdown
+dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -- keygen --private .\lab-private.pem --public .\lab-public.pem
+dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -- trust-key .\lab-public.pem --name "B-EDR Lab"
+dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -- pack --policy .\lab\BaguetteAV\BaguetteAV.EDR\samples\policies\kernel-research.policy.json --tests .\lab\BaguetteAV\BaguetteAV.EDR\samples\policies\kernel-research.tests.json --key .\lab-private.pem --publisher "B-EDR Lab" --out .\kernel-research.bedrpack
+dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -- verify-package .\kernel-research.bedrpack
+dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -- install-package .\kernel-research.bedrpack
+dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -- publishers
+dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -- revoke-key <publisher-key-id>
 dotnet run --project .\lab\BaguetteAV\BaguetteAV.EDR\BaguetteAV.EDR.PolicyTool -- install .\lab\BaguetteAV\BaguetteAV.EDR\samples\policies\kernel-research.policy.json
 ```
 

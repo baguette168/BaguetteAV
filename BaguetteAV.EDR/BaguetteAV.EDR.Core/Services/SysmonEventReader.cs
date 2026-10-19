@@ -6,9 +6,10 @@ namespace BaguetteAV.EDR.Core.Services;
 
 public sealed class SysmonEventReader : IDisposable
 {
-    private const string Channel = "Microsoft-Windows-Sysmon/Operational";
+    public const string DefaultChannel = "Microsoft-Windows-Sysmon/Operational";
     private static readonly XNamespace Ns = "http://schemas.microsoft.com/win/2004/08/events/event";
     private readonly object _gate = new();
+    private readonly string _channel;
     private EventLogWatcher? _watcher;
     private Timer? _retryTimer;
     private int _retrySeconds = 5;
@@ -17,6 +18,8 @@ public sealed class SysmonEventReader : IDisposable
     public event Action<TelemetryEvent>? EventReceived;
     public event Action<string>? StatusChanged;
     public bool IsRunning { get; private set; }
+
+    public SysmonEventReader(string? channel = null) => _channel = channel ?? DefaultChannel;
 
     public void Start()
     {
@@ -48,12 +51,17 @@ public sealed class SysmonEventReader : IDisposable
     {
         try
         {
-            var query = new EventLogQuery(Channel, PathType.LogName,
+            _ = EventLogSession.GlobalSession.GetLogInformation(_channel, PathType.LogName);
+            var query = new EventLogQuery(_channel, PathType.LogName,
                 "*[System[(EventID=1 or EventID=3 or EventID=6 or EventID=8 or EventID=10 or EventID=11 or EventID=19 or EventID=20 or EventID=21)]]");
             var watcher = new EventLogWatcher(query);
             watcher.EventRecordWritten += OnEventRecord;
             watcher.Enabled = true;
-            lock (_gate) _watcher = watcher;
+            lock (_gate)
+            {
+                ReleaseWatcher();
+                _watcher = watcher;
+            }
             IsRunning = true;
             _retrySeconds = 5;
             StatusChanged?.Invoke("Sysmon 事件通道已连接");
@@ -80,6 +88,18 @@ public sealed class SysmonEventReader : IDisposable
 
     private void OnEventRecord(object? sender, EventRecordWrittenEventArgs e)
     {
+        if (e.EventException is not null)
+        {
+            lock (_gate)
+            {
+                IsRunning = false;
+                ReleaseWatcher();
+            }
+            StatusChanged?.Invoke(string.Concat(
+                "Sysmon 事件订阅中断，已切换轮询并重试：", e.EventException.Message));
+            ScheduleRetry();
+            return;
+        }
         try
         {
             if (e.EventRecord is null) return;
@@ -159,5 +179,14 @@ public sealed class SysmonEventReader : IDisposable
     {
         lock (_gate) _disposed = true;
         Stop();
+    }
+
+    private void ReleaseWatcher()
+    {
+        if (_watcher is null) return;
+        try { _watcher.Enabled = false; } catch { }
+        try { _watcher.EventRecordWritten -= OnEventRecord; } catch { }
+        try { _watcher.Dispose(); } catch { }
+        _watcher = null;
     }
 }

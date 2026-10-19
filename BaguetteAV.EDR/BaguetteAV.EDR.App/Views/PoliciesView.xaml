@@ -5,6 +5,7 @@
              Background="Transparent">
     <UserControl.Resources>
         <conv:ZeroToVisibilityConverter x:Key="ZeroVis" />
+        <BooleanToVisibilityConverter x:Key="BoolVis" />
     </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -18,7 +19,8 @@
                 <TextBlock Text="把新的木马行为沉淀成可复用、可回滚的检测策略" Style="{StaticResource Caption}" Margin="0,2,0,0" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                <Button Content="打开策略目录" Style="{StaticResource GhostButton}" Command="{Binding OpenPolicyFolderCommand}" />
+                <Button Content="信任发布者" Style="{StaticResource GhostButton}" Command="{Binding TrustPublisherCommand}" />
+                <Button Content="打开策略目录" Style="{StaticResource GhostButton}" Margin="8,0,0,0" Command="{Binding OpenPolicyFolderCommand}" />
                 <Button Content="刷新" Style="{StaticResource GhostButton}" Margin="8,0,0,0" Command="{Binding RefreshPoliciesCommand}" />
                 <Button Content="导入策略包" Style="{StaticResource PrimaryButton}" Margin="8,0,0,0" Command="{Binding ImportPolicyCommand}" />
             </StackPanel>
@@ -101,6 +103,12 @@
                                                     <Run Text="{Binding RuleCount, Mode=OneWay}" /><Run Text=" 条规则 · " /><Run Text="{Binding Id, Mode=OneWay}" /><Run Text=" · sha256 " /><Run Text="{Binding Sha256Short, Mode=OneWay}" />
                                                 </TextBlock>
                                                 <TextBlock Text="{Binding Description}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,3,0,0" />
+                                                <TextBlock Style="{StaticResource Caption}" Margin="0,4,0,0">
+                                                    <Run Text="{Binding TrustText, Mode=OneWay}" /><Run Text=" · " /><Run Text="{Binding VerificationText, Mode=OneWay}" />
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding LoadError}" Foreground="{StaticResource DangerBrush}"
+                                                           Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                                           Visibility="{Binding HasLoadError, Converter={StaticResource BoolVis}}" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top">
                                                 <Button Content="{Binding ActionText}" Style="{StaticResource GhostButton}"
@@ -116,8 +124,54 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <TextBlock Text="尚未导入策略包。导入 JSON 后可在不重启引擎的情况下启用。" Style="{StaticResource Muted}" Margin="0,16,0,4"
+                        <TextBlock Text="尚未导入策略包。JSON 用于本机快速研究，.bedrpack 用于签名交付与回归门禁。" Style="{StaticResource Muted}" Margin="0,16,0,4"
                                    Visibility="{Binding PolicyPacks.Count, Converter={StaticResource ZeroVis}}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                    <StackPanel>
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="发布者信任" Style="{StaticResource H2}" />
+                                <TextBlock Text="本机公钥是签名策略包的信任根；撤销会立即影响后续热加载。"
+                                           Style="{StaticResource Caption}" Margin="0,4,0,0" />
+                            </StackPanel>
+                            <Button Content="导入公钥" Style="{StaticResource GhostButton}"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    Command="{Binding TrustPublisherCommand}" />
+                        </Grid>
+                        <TextBlock Text="{Binding TrustStatusText}" Style="{StaticResource Muted}" Margin="0,10,0,0" />
+                        <ItemsControl ItemsSource="{Binding TrustedPublishers}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Style="{StaticResource Body}" FontWeight="SemiBold">
+                                                    <Run Text="{Binding Name, Mode=OneWay}" /><Run Text="  " />
+                                                    <Run Text="{Binding Algorithm, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}" FontWeight="Normal" />
+                                                </TextBlock>
+                                                <TextBlock Style="{StaticResource Caption}" Margin="0,3,0,0">
+                                                    <Run Text="KeyId " /><Run Text="{Binding KeyIdShort, Mode=OneWay}" /><Run Text="… · 信任于 " /><Run Text="{Binding TrustedAtText, Mode=OneWay}" />
+                                                </TextBlock>
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Content="撤销" Style="{StaticResource GhostButton}"
+                                                    VerticalAlignment="Center"
+                                                    Command="{Binding DataContext.RevokePublisherCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="导入公钥后，只有该发布者的签名包可以通过验收。" Style="{StaticResource Caption}"
+                                   Margin="0,10,0,0"
+                                   Visibility="{Binding TrustedPublishers.Count, Converter={StaticResource ZeroVis}}" />
                     </StackPanel>
                 </Border>
 
@@ -129,9 +183,9 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock Text="研究工作流" Style="{StaticResource H2}" />
-                            <TextBlock Text="采集事件样本 → 编写 JSON 策略 → 离线演练 → 校验 → 导入启用 → 命中后回滚或调阈值"
+                            <TextBlock Text="采集事件样本 → 编写 JSON → 离线演练 → 回归测试 → 签名打包 → 验收导入 → 命中后回滚"
                                        Style="{StaticResource Muted}" Margin="0,8,0,0" TextWrapping="Wrap" />
-                            <TextBlock Text="策略包只包含声明式条件，不允许执行任意代码；适合快速沉淀内核驱动、WMI、C2、注入等研究行为。"
+                            <TextBlock Text="JSON 只包含声明式条件；.bedrpack 额外绑定发布者、文件哈希、回归集和风险分级，适合可复现研究交付。"
                                        Style="{StaticResource Caption}" Margin="0,8,0,0" TextWrapping="Wrap" />
                         </StackPanel>
                         <Button Grid.Column="1" Content="打开策略仓库" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center" Margin="20,0,0,0"

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Security.Cryptography;
 using BaguetteAV.EDR.Core.Models;
 using BaguetteAV.EDR.Core.Policy;
 using BaguetteAV.EDR.Core.Services;
@@ -23,7 +24,7 @@ internal static class Program
         var pluginRoot = TakeOption(rest, "--plugin-root");
         var json = rest.Remove("--json");
         var repository = new PolicyRepository(root);
-        var mutating = command is "install" or "activate" or "deactivate" or "rollback" or "remove" or "trust-plugin";
+        var mutating = command is "install" or "install-package" or "activate" or "deactivate" or "rollback" or "remove" or "trust-plugin" or "trust-key" or "revoke-key";
         if (root is null && (command != "trust-plugin" || pluginRoot is null) && mutating &&
             !DataDirectorySecurity.TryHarden(SettingsStore.DataDirectory, out var aclError))
         {
@@ -36,6 +37,13 @@ internal static class Program
             {
                 "validate" => Validate(rest, json),
                 "install" => Install(repository, rest, json),
+                "install-package" => InstallPackage(repository, rest, json),
+                "verify-package" => VerifyPackage(repository, rest, json),
+                "pack" => Pack(rest, json),
+                "keygen" => KeyGen(rest, json),
+                "trust-key" => TrustKey(repository, rest),
+                "revoke-key" => RevokeKey(repository, rest),
+                "publishers" => Publishers(repository, json),
                 "list" => List(repository, json),
                 "activate" => Activate(repository, rest),
                 "deactivate" => Deactivate(repository, rest),
@@ -98,8 +106,120 @@ internal static class Program
         if (json) { WriteJson(installed); return 0; }
         if (installed.Count == 0) { Console.WriteLine("尚未安装策略包"); return 0; }
         foreach (var policy in installed)
-            Console.WriteLine($"{(policy.Active ? "*" : " ")} {policy.Name}  {policy.Id} v{policy.Version}  规则={policy.RuleCount}  导入={policy.ImportedAt:yyyy-MM-dd HH:mm:ss}  sha256={policy.Sha256[..12]}");
+        {
+            var marker = policy.EffectiveActive ? "*" : policy.Active ? "!" : " ";
+            var loadState = string.IsNullOrEmpty(policy.LoadError)
+                ? string.Empty
+                : string.Concat("  加载拒绝=", policy.LoadError);
+            Console.WriteLine($"{marker} {policy.Name}  {policy.Id} v{policy.Version}  规则={policy.RuleCount}  验签={policy.SignatureVerified}  发布者={policy.Publisher}  回归={policy.TestPassedCount}/{policy.TestCaseCount}  风险={policy.RiskLevel}  sha256={policy.Sha256[..12]}{loadState}");
+        }
         return 0;
+    }
+
+    private static int InstallPackage(PolicyRepository repository, List<string> args, bool json)
+    {
+        var activate = !args.Remove("--no-activate");
+        if (args.Count != 1) return Usage("install-package <package.bedrpack> [--no-activate]");
+        var result = repository.InstallPackageFromFile(args[0], activate);
+        if (json) WriteJson(result);
+        else
+        {
+            Console.WriteLine(result.Message);
+            if (result.Validation is not null) PrintValidation(result.Validation);
+            if (result.Inspection is { Success: true } inspection)
+            {
+                Console.WriteLine(string.Concat(
+                    "发布者：", inspection.PublisherName,
+                    "  验签=", inspection.SignatureValid,
+                    "  回归=", inspection.TestResult?.PassedCount, "/", inspection.TestResult?.CaseCount,
+                    "  覆盖=", inspection.CoveredEnabledRuleCount, "/", inspection.EnabledRuleCount,
+                    "  风险=", inspection.RiskLevel));
+            }
+        }
+        return result.Success ? 0 : 2;
+    }
+
+    private static int VerifyPackage(PolicyRepository repository, List<string> args, bool json)
+    {
+        var allowUntrusted = args.Remove("--allow-untrusted");
+        if (args.Count != 1) return Usage("verify-package <package.bedrpack> [--allow-untrusted] [--json]");
+        var inspection = PolicyPackageVerifier.Verify(
+            args[0], new PolicyTrustStore(repository.Root), allowUntrusted);
+        if (json)
+        {
+            WriteJson(inspection);
+        }
+        else
+        {
+            Console.WriteLine(inspection.Message);
+            if (inspection.Success)
+            {
+                Console.WriteLine(string.Concat(
+                    "策略：", inspection.Pack?.Name,
+                    " v", inspection.Pack?.Version,
+                    "  发布者=", inspection.PublisherName,
+                    "  验签=", inspection.SignatureValid));
+                Console.WriteLine(string.Concat(
+                    "回归=", inspection.TestResult?.PassedCount, "/", inspection.TestResult?.CaseCount,
+                    "  规则覆盖=", inspection.CoveredEnabledRuleCount, "/", inspection.EnabledRuleCount,
+                    "  风险=", inspection.RiskLevel));
+                Console.WriteLine(string.Concat("能力：", string.Join(",", inspection.Capabilities)));
+            }
+            foreach (var warning in inspection.Warnings) Console.WriteLine(string.Concat("WARN  ", warning));
+            if (inspection.Validation is not null) PrintValidation(inspection.Validation);
+        }
+        return inspection.Success ? 0 : 2;
+    }
+
+    private static int Pack(List<string> args, bool json)
+    {
+        var policy = TakeOption(args, "--policy");
+        var tests = TakeOption(args, "--tests");
+        var fixtures = TakeOption(args, "--fixtures");
+        var readme = TakeOption(args, "--readme");
+        var key = TakeOption(args, "--key");
+        var publisher = TakeOption(args, "--publisher");
+        var output = TakeOption(args, "--out");
+        var requireAllRulesCovered = !args.Remove("--allow-uncovered");
+        var requireNegativeCase = !args.Remove("--allow-no-negative");
+        if (args.Count != 0 || string.IsNullOrWhiteSpace(policy) ||
+            string.IsNullOrWhiteSpace(tests) || string.IsNullOrWhiteSpace(key) ||
+            string.IsNullOrWhiteSpace(publisher) || string.IsNullOrWhiteSpace(output))
+            return Usage("pack --policy <json> --tests <json> --key <pem> --publisher <name> --out <bedrpack> [--fixtures <json>] [--readme <md>]");
+        var result = PolicyPackageBuilder.Build(
+            policy!, tests!, fixtures, readme, key!, publisher!, output!,
+            requireAllRulesCovered, requireNegativeCase);
+        if (json) WriteJson(result);
+        else Console.WriteLine(result.Message);
+        return result.Success ? 0 : 2;
+    }
+
+    private static int KeyGen(List<string> args, bool json)
+    {
+        var privatePath = TakeOption(args, "--private");
+        var publicPath = TakeOption(args, "--public");
+        if (args.Count != 0 || string.IsNullOrWhiteSpace(privatePath) || string.IsNullOrWhiteSpace(publicPath))
+            return Usage("keygen --private <private.pem> --public <public.pem>");
+        try
+        {
+            using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            File.WriteAllText(privatePath!, key.ExportPkcs8PrivateKeyPem(), new UTF8Encoding(false));
+            File.WriteAllText(publicPath!, key.ExportSubjectPublicKeyInfoPem(), new UTF8Encoding(false));
+            var keyId = PolicyTrustStore.ComputeKeyId(key);
+            if (json) WriteJson(new { keyId, privateKey = privatePath, publicKey = publicPath });
+            else
+            {
+                Console.WriteLine(string.Concat("已生成P-256发布者密钥：", keyId));
+                Console.WriteLine(string.Concat("私钥：", privatePath));
+                Console.WriteLine(string.Concat("公钥：", publicPath));
+            }
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(string.Concat("生成密钥失败：", ex.Message));
+            return 2;
+        }
     }
 
     private static int Activate(PolicyRepository repository, List<string> args)
@@ -291,6 +411,42 @@ internal static class Program
         return 0;
     }
 
+    private static int TrustKey(PolicyRepository repository, List<string> args)
+    {
+        var name = TakeOption(args, "--name");
+        if (args.Count != 1) return Usage("trust-key <public.pem> [--name <publisher>]");
+        var result = new PolicyTrustStore(repository.Root).ImportPublicKey(args[0], name);
+        Console.WriteLine(result.Message);
+        if (result.Publisher is not null)
+            Console.WriteLine(string.Concat("KeyId=", result.Publisher.KeyId));
+        return result.Success ? 0 : 2;
+    }
+
+    private static int Publishers(PolicyRepository repository, bool json)
+    {
+        var publishers = new PolicyTrustStore(repository.Root).List(out var error);
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            Console.Error.WriteLine(error);
+            return 2;
+        }
+        if (json) { WriteJson(publishers); return 0; }
+        if (publishers.Count == 0) { Console.WriteLine("尚未信任任何策略发布者"); return 0; }
+        foreach (var publisher in publishers)
+            Console.WriteLine(string.Concat(
+                publisher.Name, "  ", publisher.KeyId,
+                "  ", publisher.TrustedAt.ToString("yyyy-MM-dd HH:mm:ss")));
+        return 0;
+    }
+
+    private static int RevokeKey(PolicyRepository repository, List<string> args)
+    {
+        if (args.Count != 1) return Usage("revoke-key <publisher-key-id> [--root <dir>]");
+        var result = new PolicyTrustStore(repository.Root).RemovePublisher(args[0]);
+        Console.WriteLine(result.Message);
+        return result.Success ? 0 : 2;
+    }
+
     private static int Plugins(PluginLoader loader, bool json)
     {
         var result = loader.Load();
@@ -359,6 +515,13 @@ B-EDR 策略工具
 
   bedr-policy validate <policy.json> [--json]
   bedr-policy install <policy.json> [--no-activate] [--root <dir>] [--json]
+  bedr-policy keygen --private <pem> --public <pem> [--json]
+  bedr-policy trust-key <public.pem> [--name <publisher>] [--root <dir>]
+  bedr-policy revoke-key <publisher-key-id> [--root <dir>]
+  bedr-policy publishers [--root <dir>] [--json]
+  bedr-policy pack --policy <json> --tests <json> --key <pem> --publisher <name> --out <bedrpack> [--fixtures <json>] [--readme <md>]
+  bedr-policy verify-package <package.bedrpack> [--allow-untrusted] [--json]
+  bedr-policy install-package <package.bedrpack> [--no-activate] [--root <dir>] [--json]
   bedr-policy list [--root <dir>] [--json]
   bedr-policy activate <policy-id> <version> [--root <dir>]
   bedr-policy deactivate <policy-id> [--root <dir>]
@@ -372,6 +535,8 @@ B-EDR 策略工具
   bedr-policy fields [--json]
   bedr-policy example
 
+普通JSON用于本机快速研究；.bedrpack用于可分发交付。
+签名策略包会校验发布者、逐文件哈希、回归测试和规则覆盖。
 策略包只包含声明式条件，不允许在策略中执行任意代码。
 需要深度扩展时使用独立的 .NET 插件接口。
 """);

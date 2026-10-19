@@ -3,6 +3,7 @@
 B-EDR 是 `BaguetteAV` 的第二代 Windows 单机端点检测与响应项目。它保留原项目的图形化杀毒软件形态，同时把检测、响应、策略管理拆成可研究、可验证、可回滚的工程模块。
 
 策略系统设计见 [POLICY_ARCHITECTURE.md](docs/POLICY_ARCHITECTURE.md)。
+签名策略包、信任链和研究交付模型见 [策略包与信任链架构](docs/策略包与信任链架构.md)。
 面向研究者的最小策略、样本和插件接入示例见 [策略扩展开发指南](docs/策略扩展开发指南.md)。
 
 ## 架构
@@ -34,6 +35,8 @@ B-EDR 是 `BaguetteAV` 的第二代 Windows 单机端点检测与响应项目。
 - 进程终止、文件隔离、远端地址阻断
 - ClamAV 按需扫描与 Rootkit 交叉视图检查
 - 声明式 JSON 策略包：校验、SHA256 完整性复核、版本不可变、规则冲突拒绝、原子安装、审计日志、仓库监视自动热加载、停用、回滚
+- 签名 `.bedrpack` 交付包：ECDSA P-256 发布者验签、逐文件哈希、ZIP 边界检查、正样本覆盖、严格负样本、导入验收和热加载复验
+- 本机发布者信任管理：GUI 公钥清单与撤销、信任审计、签名失陷后的失败关闭，以及带旧版本恢复的暂存式原子安装
 - 实时遥测导出、离线演练、自定义字段和受限响应动作
 - 策略回归测试（expect/forbid/strict）与 ATT&CK/遥测覆盖报告
 - 受信任代码插件：未登记或 SHA256 不匹配的 DLL 默认拒绝加载
@@ -69,12 +72,14 @@ B-EDR 是 `BaguetteAV` 的第二代 Windows 单机端点检测与响应项目。
 2. 编写策略包和事件样本。
 3. 使用 GUI“离线演练”或 `bedr-policy simulate` 验证命中与误报。
 4. 用 `bedr-policy test` 固定回归用例，用 `coverage` 量化覆盖。
-5. 导入策略，后台服务热加载，无需重启。
-6. 观察真实告警；用版本回滚恢复上一版策略。
+5. 用 `pack` 生成签名 `.bedrpack`，先在本机信任发布者，再导入并验收。
+6. 后台服务复验签名与回归后热加载，无需重启。
+7. 观察真实告警；用版本回滚恢复上一版策略。
 
-策略加载时会重新核对活动版本、包 ID 和文件 SHA256；被替换或修改的
-`policy.json` 会被拒绝，其他内置规则和已校验策略继续运行。SHA256 是安装
-完整性标记，不是发布者身份签名，管理员权限仍属于最高信任边界。
+普通 JSON 加载时会重新核对活动版本、包 ID 和文件 SHA256。签名
+`.bedrpack` 还会在每次热加载时重新验签、核对包内文件哈希并重跑回归；
+被替换、修改或信任公钥被移除的包会被拒绝，其他内置规则和已校验策略继续
+运行。管理员权限仍是本机最高信任边界。
 
 数据目录会在服务启动和策略导入前收紧为仅 `SYSTEM` 与 `Administrators`
 可写；如果加固失败，服务会禁用外部策略与插件加载。相同策略 ID/版本不允许
@@ -88,6 +93,13 @@ dotnet run --project .\BaguetteAV.EDR.PolicyTool -- validate .\samples\policies\
 dotnet run --project .\BaguetteAV.EDR.PolicyTool -- simulate .\samples\policies\kernel-research.policy.json .\samples\policies\kernel-research.events.json
 dotnet run --project .\BaguetteAV.EDR.PolicyTool -- test .\samples\policies\kernel-research.policy.json .\samples\policies\kernel-research.tests.json
 dotnet run --project .\BaguetteAV.EDR.PolicyTool -- coverage --policy .\samples\policies\kernel-research.policy.json --markdown
+dotnet run --project .\BaguetteAV.EDR.PolicyTool -- keygen --private .\lab-private.pem --public .\lab-public.pem
+dotnet run --project .\BaguetteAV.EDR.PolicyTool -- trust-key .\lab-public.pem --name "B-EDR Lab"
+dotnet run --project .\BaguetteAV.EDR.PolicyTool -- pack --policy .\samples\policies\kernel-research.policy.json --tests .\samples\policies\kernel-research.tests.json --key .\lab-private.pem --publisher "B-EDR Lab" --out .\kernel-research.bedrpack
+dotnet run --project .\BaguetteAV.EDR.PolicyTool -- verify-package .\kernel-research.bedrpack
+dotnet run --project .\BaguetteAV.EDR.PolicyTool -- install-package .\kernel-research.bedrpack
+dotnet run --project .\BaguetteAV.EDR.PolicyTool -- publishers
+dotnet run --project .\BaguetteAV.EDR.PolicyTool -- revoke-key <publisher-key-id>
 dotnet run --project .\BaguetteAV.EDR.PolicyTool -- install .\samples\policies\kernel-research.policy.json
 dotnet run --project .\BaguetteAV.EDR.PolicyTool -- list
 ```
@@ -128,7 +140,7 @@ dotnet test .\BaguetteAV.EDR.Tests\BaguetteAV.EDR.Tests.csproj
 
 - `settings.json`：防护与响应设置
 - `detections\detections-yyyyMMdd.jsonl`：告警记录
-- `policies\`：已安装策略、状态和版本
+- `policies\`：已安装策略、状态、版本、`trusted-publishers.json`、`trust-audit.jsonl` 与策略审计
 - `plugins\`：受信任插件与 `trusted.json`
 - `quarantine\`：隔离文件
 - `edr.log`：运行日志

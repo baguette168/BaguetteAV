@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Configuration = "Release",
     [string]$Version = "2.0.0"
 )
@@ -36,6 +36,15 @@ if ($LASTEXITCODE -ne 0) { throw "Policy tool publish failed" }
 Copy-Item -LiteralPath (Join-Path $root "samples\policies") -Destination (Join-Path $output "policies") -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $root "README.md") -Destination $output -Force
 Copy-Item -LiteralPath (Join-Path $root "docs") -Destination $output -Recurse -Force
+if (Test-Path -LiteralPath (Join-Path $root "scripts")) {
+    Copy-Item -LiteralPath (Join-Path $root "scripts") -Destination $output -Recurse -Force
+}
+$workspaceResearchDoc = Join-Path $root "..\..\..\docs\B-EDR自定义策略架构.md"
+if (Test-Path -LiteralPath $workspaceResearchDoc) {
+    Copy-Item -LiteralPath $workspaceResearchDoc -Destination (Join-Path $output "docs") -Force
+} else {
+    Write-Warning "Research architecture document not found: $workspaceResearchDoc"
+}
 Copy-Item -LiteralPath (Join-Path $root "Install-BEDR.ps1") -Destination $output -Force
 
 $buildInfo = [ordered]@{

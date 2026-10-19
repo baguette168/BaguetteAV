@@ -35,7 +35,33 @@ public sealed class PolicyRepository
         }
     }
 
+    public PolicyImportResult InstallPackageFromFile(string sourcePath, bool activate = true)
+    {
+        var inspection = PolicyPackageVerifier.Verify(
+            sourcePath, new PolicyTrustStore(_root));
+        if (!inspection.Success || inspection.Pack is null)
+            return new PolicyImportResult(
+                false,
+                inspection.Message,
+                null,
+                inspection.Validation,
+                inspection);
+        var result = InstallCore(
+            inspection.PolicyJson,
+            sourcePath,
+            activate,
+            inspection);
+        return result with { Inspection = inspection };
+    }
+
     public PolicyImportResult Install(string json, string sourceName, bool activate = true)
+        => InstallCore(json, sourceName, activate, null);
+
+    private PolicyImportResult InstallCore(
+        string json,
+        string sourceName,
+        bool activate,
+        PolicyPackageInspection? package)
     {
         var validation = PolicyValidator.ValidateJson(json, out var pack);
         if (pack is null || !validation.IsValid)
@@ -49,7 +75,8 @@ public sealed class PolicyRepository
                     return new PolicyImportResult(false, string.Concat("审计日志不可写，拒绝导入策略：", auditError), null, validation);
 
                 var hash = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
-                var folder = Path.Combine(InstalledDirectory, pack.Id, pack.Version);
+                var parent = Path.Combine(InstalledDirectory, pack.Id);
+                var folder = Path.Combine(parent, pack.Version);
                 var policyPath = Path.Combine(folder, "policy.json");
                 if (File.Exists(policyPath))
                 {
@@ -67,48 +94,132 @@ public sealed class PolicyRepository
                         validation.Error("rules", conflict);
                     return new PolicyImportResult(false, "策略规则 ID 冲突", null, validation);
                 }
-                Directory.CreateDirectory(folder);
-                AtomicWrite(policyPath, json);
-                var meta = new PolicyMeta
-                {
-                    Id = pack.Id,
-                    Name = pack.Name,
-                    Version = pack.Version,
-                    Author = pack.Author,
-                    Description = pack.Description,
-                    RuleCount = pack.Rules.Count,
-                    Sha256 = hash,
-                    Source = sourceName,
-                    ImportedAt = DateTime.Now
-                };
-                AtomicWrite(Path.Combine(folder, "meta.json"), JsonSerializer.Serialize(meta, PolicyJson.Options));
 
-                var state = LoadState();
-                if (!state.Packs.TryGetValue(pack.Id, out var entry))
-                    state.Packs[pack.Id] = entry = new PolicyStateEntry();
-                if (activate)
+                Directory.CreateDirectory(InstalledDirectory);
+                var stagingRoot = Path.Combine(_root, ".staging");
+                var staging = Path.Combine(stagingRoot, Guid.NewGuid().ToString("N"));
+                var backup = string.Empty;
+                var committed = false;
+                try
                 {
-                    if (!string.IsNullOrWhiteSpace(entry.Active) && entry.Active != pack.Version)
-                        entry.Previous = entry.Active;
-                    entry.Active = pack.Version;
-                    SaveState(state);
+                    Directory.CreateDirectory(staging);
+                    File.WriteAllText(Path.Combine(staging, "policy.json"), json, new System.Text.UTF8Encoding(false));
+                    if (package is not null)
+                    {
+                        File.WriteAllText(Path.Combine(staging, "tests.json"), package.TestsJson, new System.Text.UTF8Encoding(false));
+                        File.WriteAllText(Path.Combine(staging, "manifest.json"), package.ManifestJson, new System.Text.UTF8Encoding(false));
+                        File.WriteAllText(Path.Combine(staging, "manifest.sig"), package.SignatureText, new System.Text.UTF8Encoding(false));
+                        if (!File.Exists(sourceName))
+                            throw new InvalidDataException("签名策略包源文件已不存在，拒绝安装");
+                        var stagedPackage = Path.Combine(staging, "package.bedrpack");
+                        File.Copy(sourceName, stagedPackage, true);
+                        var stagedPackageHash = Convert.ToHexString(
+                            SHA256.HashData(File.ReadAllBytes(stagedPackage))).ToLowerInvariant();
+                        if (!string.Equals(stagedPackageHash, package.PackageSha256, StringComparison.OrdinalIgnoreCase))
+                            throw new InvalidDataException("策略包在验签后发生变化，拒绝安装");
+                    }
+
+                    var meta = new PolicyMeta
+                    {
+                        Id = pack.Id,
+                        Name = pack.Name,
+                        Version = pack.Version,
+                        Author = pack.Author,
+                        Description = pack.Description,
+                        RuleCount = pack.Rules.Count,
+                        Sha256 = hash,
+                        Source = sourceName,
+                        ImportedAt = DateTime.Now,
+                        Publisher = package?.PublisherName ?? string.Empty,
+                        SignatureVerified = package?.SignatureValid == true,
+                        PackageSha256 = package?.PackageSha256 ?? string.Empty,
+                        TestSuiteSha256 = package?.TestSuiteSha256 ?? string.Empty,
+                        TestCaseCount = package?.TestResult?.CaseCount ?? 0,
+                        TestPassedCount = package?.TestResult?.PassedCount ?? 0,
+                        RiskLevel = package?.RiskLevel ?? string.Empty,
+                        Capabilities = package?.Capabilities ?? new List<string>()
+                    };
+                    File.WriteAllText(
+                        Path.Combine(staging, "meta.json"),
+                        JsonSerializer.Serialize(meta, PolicyJson.Options),
+                        new System.Text.UTF8Encoding(false));
+
+                    Directory.CreateDirectory(parent);
+                    var state = LoadState();
+                    if (Directory.Exists(folder))
+                    {
+                        backup = Path.Combine(_root, ".staging", string.Concat("backup-", Guid.NewGuid().ToString("N")));
+                        Directory.Move(folder, backup);
+                    }
+                    try
+                    {
+                        Directory.Move(staging, folder);
+                        state.Packs.TryGetValue(pack.Id, out var entry);
+                        if (entry is null)
+                        {
+                            entry = new PolicyStateEntry();
+                            state.Packs[pack.Id] = entry;
+                        }
+                        if (activate)
+                        {
+                            if (!string.IsNullOrWhiteSpace(entry.Active) && entry.Active != pack.Version)
+                                entry.Previous = entry.Active;
+                            entry.Active = pack.Version;
+                        }
+
+                        Audit(package is null ? "install" : "install-package", pack.Id, pack.Version, hash);
+                        if (activate) SaveState(state);
+                    }
+                    catch
+                    {
+                        TryDeleteDirectory(folder);
+                        if (backup.Length > 0 && Directory.Exists(backup))
+                            Directory.Move(backup, folder);
+                        throw;
+                    }
+                    committed = true;
+                    if (backup.Length > 0) TryDeleteDirectory(backup);
+
+                    var installed = new InstalledPolicy
+                    {
+                        Id = pack.Id,
+                        Name = pack.Name,
+                        Version = pack.Version,
+                        Author = pack.Author,
+                        Description = pack.Description,
+                        RuleCount = pack.Rules.Count,
+                        Active = activate || (state.Packs.TryGetValue(pack.Id, out var activeEntry) &&
+                            string.Equals(activeEntry.Active, pack.Version, StringComparison.OrdinalIgnoreCase)),
+                        ImportedAt = meta.ImportedAt,
+                        Sha256 = hash,
+                        Path = folder,
+                        Publisher = meta.Publisher,
+                        SignatureVerified = meta.SignatureVerified,
+                        PackageSha256 = meta.PackageSha256,
+                        TestCaseCount = meta.TestCaseCount,
+                        TestPassedCount = meta.TestPassedCount,
+                        RiskLevel = meta.RiskLevel,
+                        Capabilities = meta.Capabilities
+                    };
+                    var message = package is null
+                        ? (activate ? "策略已导入并启用" : "策略已导入")
+                        : (activate ? "签名策略包已导入并启用" : "签名策略包已导入");
+                    return new PolicyImportResult(true, message, installed, validation, package);
                 }
-                Audit("install", pack.Id, pack.Version, hash);
-
-                var installed = new InstalledPolicy
+                finally
                 {
-                    Id = pack.Id,
-                    Name = pack.Name,
-                    Version = pack.Version,
-                    Author = pack.Author,
-                    Description = pack.Description,
-                    RuleCount = pack.Rules.Count,
-                    Active = activate || string.Equals(entry.Active, pack.Version, StringComparison.OrdinalIgnoreCase),
-                    ImportedAt = meta.ImportedAt,
-                    Sha256 = hash,
-                    Path = folder
-                };
-                return new PolicyImportResult(true, activate ? "策略已导入并启用" : "策略已导入", installed, validation);
+                    TryDeleteDirectory(staging);
+                    if (!committed && backup.Length > 0 && Directory.Exists(backup) && !Directory.Exists(folder))
+                    {
+                        try { Directory.Move(backup, folder); } catch { }
+                    }
+                    try
+                    {
+                        if (Directory.Exists(stagingRoot) && !Directory.EnumerateFileSystemEntries(stagingRoot).Any())
+                            Directory.Delete(stagingRoot);
+                    }
+                    catch { }
+                }
             }
             catch (Exception ex)
             {
@@ -122,6 +233,12 @@ public sealed class PolicyRepository
         lock (_gate)
         {
             var state = LoadState();
+            var loadErrors = LoadActive().Errors
+                .GroupBy(error => error.PolicyId, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => string.Join("；", group.Select(error => error.Message).Distinct()),
+                    StringComparer.OrdinalIgnoreCase);
             var result = new List<InstalledPolicy>();
             if (!Directory.Exists(InstalledDirectory)) return result;
             foreach (var packDir in Directory.EnumerateDirectories(InstalledDirectory))
@@ -136,6 +253,10 @@ public sealed class PolicyRepository
                         var meta = JsonSerializer.Deserialize<PolicyMeta>(File.ReadAllText(metaPath), PolicyJson.Options);
                         if (meta is null) continue;
                         state.Packs.TryGetValue(meta.Id, out var entry);
+                        var isActive = string.Equals(entry?.Active, meta.Version, StringComparison.OrdinalIgnoreCase);
+                        var loadError = isActive && loadErrors.TryGetValue(meta.Id, out var message)
+                            ? message
+                            : string.Empty;
                         result.Add(new InstalledPolicy
                         {
                             Id = meta.Id,
@@ -144,12 +265,19 @@ public sealed class PolicyRepository
                             Author = meta.Author,
                             Description = meta.Description,
                             RuleCount = meta.RuleCount,
-                            Active = string.Equals(entry?.Active, meta.Version, StringComparison.OrdinalIgnoreCase),
-                            CanRollback = string.Equals(entry?.Active, meta.Version, StringComparison.OrdinalIgnoreCase) &&
-                                          !string.IsNullOrWhiteSpace(entry?.Previous),
+                            Active = isActive,
+                            CanRollback = isActive && !string.IsNullOrWhiteSpace(entry?.Previous),
                             ImportedAt = meta.ImportedAt,
                             Sha256 = meta.Sha256,
-                            Path = versionDir
+                            Path = versionDir,
+                            Publisher = meta.Publisher,
+                            SignatureVerified = meta.SignatureVerified,
+                            PackageSha256 = meta.PackageSha256,
+                            TestCaseCount = meta.TestCaseCount,
+                            TestPassedCount = meta.TestPassedCount,
+                            RiskLevel = meta.RiskLevel,
+                            Capabilities = meta.Capabilities,
+                            LoadError = loadError
                         });
                     }
                     catch { }
@@ -284,6 +412,28 @@ public sealed class PolicyRepository
                             bundle.Errors.Add(new PolicyLoadError(pack.Id, error));
                         continue;
                     }
+                    if (meta.SignatureVerified)
+                    {
+                        var packagePath = Path.Combine(folder, "package.bedrpack");
+                        if (!File.Exists(packagePath))
+                        {
+                            bundle.Errors.Add(new PolicyLoadError(
+                                pack.Id, "签名策略包的归档缺失，拒绝加载"));
+                            continue;
+                        }
+                        var packageCheck = PolicyPackageVerifier.Verify(
+                            packagePath, new PolicyTrustStore(_root));
+                        if (!packageCheck.Success ||
+                            packageCheck.Pack is null ||
+                            !string.Equals(packageCheck.Pack.Id, pack.Id, StringComparison.OrdinalIgnoreCase) ||
+                            !string.Equals(packageCheck.Pack.Version, pack.Version, StringComparison.OrdinalIgnoreCase))
+                        {
+                            bundle.Errors.Add(new PolicyLoadError(
+                                pack.Id,
+                                string.Concat("签名策略包复验失败：", packageCheck.Message)));
+                            continue;
+                        }
+                    }
                     bundle.Packs.Add(pack);
                 }
                 catch (Exception ex)
@@ -406,6 +556,15 @@ public sealed class PolicyRepository
         File.Move(temp, path, true);
     }
 
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path)) Directory.Delete(path, true);
+        }
+        catch { }
+    }
+
     private sealed class PolicyState
     {
         public int SchemaVersion { get; set; } = 1;
@@ -429,5 +588,13 @@ public sealed class PolicyRepository
         public string Sha256 { get; set; } = string.Empty;
         public string Source { get; set; } = string.Empty;
         public DateTime ImportedAt { get; set; }
+        public string Publisher { get; set; } = string.Empty;
+        public bool SignatureVerified { get; set; }
+        public string PackageSha256 { get; set; } = string.Empty;
+        public string TestSuiteSha256 { get; set; } = string.Empty;
+        public int TestCaseCount { get; set; }
+        public int TestPassedCount { get; set; }
+        public string RiskLevel { get; set; } = string.Empty;
+        public List<string> Capabilities { get; set; } = new();
     }
 }

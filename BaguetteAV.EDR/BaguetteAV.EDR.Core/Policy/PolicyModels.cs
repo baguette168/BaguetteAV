@@ -69,6 +69,15 @@ public sealed class InstalledPolicy
     public DateTime ImportedAt { get; init; }
     public string Sha256 { get; init; } = string.Empty;
     public string Path { get; init; } = string.Empty;
+    public string Publisher { get; init; } = string.Empty;
+    public bool SignatureVerified { get; init; }
+    public string PackageSha256 { get; init; } = string.Empty;
+    public int TestCaseCount { get; init; }
+    public int TestPassedCount { get; init; }
+    public string RiskLevel { get; init; } = string.Empty;
+    public List<string> Capabilities { get; init; } = new();
+    public string LoadError { get; init; } = string.Empty;
+    public bool EffectiveActive => Active && string.IsNullOrEmpty(LoadError);
 }
 
 public sealed record PolicyLoadError(string PolicyId, string Message);
@@ -87,4 +96,9 @@ public sealed class PolicySimulationResult
     public List<PolicySimulationHit> Hits { get; } = new();
 }
 
-public sealed record PolicyImportResult(bool Success, string Message, InstalledPolicy? Policy, PolicyValidationResult? Validation);
+public sealed record PolicyImportResult(
+    bool Success,
+    string Message,
+    InstalledPolicy? Policy,
+    PolicyValidationResult? Validation,
+    PolicyPackageInspection? Inspection = null);
